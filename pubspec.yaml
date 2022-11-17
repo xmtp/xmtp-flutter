@@ -9,14 +9,19 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
-  xmtp_proto: ^0.0.1-development
-  pointycastle: ^3.6.2
+  grpc: ^3.1.0
+  cryptography: ^2.0.5
+  cryptography_flutter: ^2.0.2
+  fixnum: ^1.0.1
   flutter:
     sdk: flutter
+  web3dart: ^2.4.1
+  xmtp_proto: ^0.0.1-development
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  mocktail: ^0.3.0
 
 flutter:
