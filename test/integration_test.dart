@@ -1,15 +1,18 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:xmtp/src/signature.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/api.dart';
 import 'package:xmtp/src/auth.dart';
 import 'package:xmtp/src/contact.dart';
+import 'package:xmtp/src/content.dart';
 import 'package:xmtp/src/topic.dart';
 
 void main() {
@@ -205,7 +208,7 @@ void main() {
       var authToken = await authorized.createAuthToken();
       api.setAuthToken(authToken);
 
-      var bundle = authorized.toContactBundle();
+      var bundle = createContactBundleV1(authorized);
       await _saveContact(api, alice.address.hexEip55, bundle);
 
       // Now when we lookup alice again, she should have a contact
@@ -214,10 +217,266 @@ void main() {
       expect(stored.first.wallet.hexEip55, alice.address.hexEip55);
     },
   );
+
+  // This creates 2 users connected to the API and sends DMs
+  // back and forth using message API V1.
+  test(
+    skip: "manual testing only",
+    "v1 messaging: intros, reading, writing, streaming",
+    () async {
+      // Setup the API clients.
+      var aliceApi = Api.create(host: '127.0.0.1', port: 5556, isSecure: false);
+      var bobApi = Api.create(host: '127.0.0.1', port: 5556, isSecure: false);
+
+      // setup Alice's account and API session
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceIdentity = EthPrivateKey.createRandom(Random.secure());
+      var aliceKeys = await aliceWallet.createIdentity(aliceIdentity);
+      var aliceAuthToken = await aliceKeys.createAuthToken();
+      aliceApi.setAuthToken(aliceAuthToken);
+      await _saveContact(
+        aliceApi,
+        aliceWallet.address.hexEip55,
+        createContactBundleV1(aliceKeys),
+      );
+
+      // setup Bob's account and API session
+      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobIdentity = EthPrivateKey.createRandom(Random.secure());
+      var bobKeys = await bobWallet.createIdentity(bobIdentity);
+      var bobAuthToken = await bobKeys.createAuthToken();
+      bobApi.setAuthToken(bobAuthToken);
+      await _saveContact(
+        bobApi,
+        bobWallet.address.hexEip55,
+        createContactBundleV1(bobKeys),
+      );
+
+      // Load their contacts
+      var aliceAddress = aliceWallet.address.hexEip55;
+      var bobAddress = bobWallet.address.hexEip55;
+      var aliceContact = (await _lookupContact(aliceApi, aliceAddress)).first;
+      var bobContact = (await _lookupContact(bobApi, bobAddress)).first;
+
+      expect(aliceContact.whichVersion(), xmtp.ContactBundle_Version.v1);
+      expect(bobContact.whichVersion(), xmtp.ContactBundle_Version.v1);
+
+      // Gather subscriptions here so we can clean them up later.
+      //  map of { topic -> subscription }
+      Map<String, StreamSubscription<xmtp.Envelope>> subscription = {};
+
+      // We'll log the transcript here
+      var transcript = [];
+      // This creates a transcript recorder that listens to intros + DMs.
+      createRecorder(
+        EthPrivateKey wallet,
+        Api api,
+        xmtp.PrivateKeyBundle keys,
+      ) =>
+          (e) async {
+            var intro = xmtp.Message.fromBuffer(e.message);
+            var header = xmtp.MessageHeaderV1.fromBuffer(intro.v1.headerBytes);
+            var sender = header.sender.identityKey
+                .recoverWalletSignerPublicKey()
+                .toEthereumAddress();
+            var recipient = header.recipient.identityKey
+                .recoverWalletSignerPublicKey()
+                .toEthereumAddress();
+            var peer =
+                {sender, recipient}.firstWhere((a) => a != wallet.address);
+
+            debugPrint("${wallet.address} was introduced to $peer");
+            // Now subscribe to the DMs with this peer.
+            var dms =
+                Topic.directMessageV1(wallet.address.hexEip55, peer.hexEip55);
+            subscription[dms] ??= api.client
+                .subscribe(xmtp.SubscribeRequest(contentTopics: [dms]))
+                .listen((e) async {
+              var dm = xmtp.Message.fromBuffer(e.message);
+              var encoded = await decryptMessageV1(dm.v1, keys);
+              var header = xmtp.MessageHeaderV1.fromBuffer(dm.v1.headerBytes);
+              var sender = header.sender.identityKey
+                  .recoverWalletSignerPublicKey()
+                  .toEthereumAddress();
+              var text = utf8.decode(encoded.content); // todo: use codecs
+              transcript.add("${sender.hexEip55}> $text");
+            });
+          };
+
+      // This attaches transcript recorders to Alice and Bobs intros + dms.
+      var bobIntros = Topic.userIntro(bobAddress);
+      subscription[bobIntros] ??= bobApi.client
+          .subscribe(xmtp.SubscribeRequest(contentTopics: [bobIntros]))
+          .listen(createRecorder(bobWallet, bobApi, bobKeys));
+      var aliceIntros = Topic.userIntro(aliceAddress);
+      subscription[aliceIntros] ??= aliceApi.client
+          .subscribe(xmtp.SubscribeRequest(contentTopics: [aliceIntros]))
+          .listen(createRecorder(aliceWallet, aliceApi, aliceKeys));
+
+      // Wait a beat to make sure the subscriptions are live.
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Now pretend that Alice sends Bob an intro + DM
+      var fromAlice = await encryptMessageV1(
+          aliceKeys,
+          bobContact.v1.keyBundle,
+          xmtp.EncodedContent(
+            type: contentTypeText,
+            fallback: "hello Bob, it's me Alice!",
+            content: utf8.encode("hello Bob, it's me Alice!"),
+          ));
+
+      // Alice sends the initial message to their /dm and both of their /intros
+      await _sendIntroV1(aliceApi, bobAddress, fromAlice);
+      await _sendIntroV1(aliceApi, aliceAddress, fromAlice);
+      await _sendDirectMessageV1(aliceApi, aliceAddress, bobAddress, fromAlice);
+
+      // And then a couple seconds later Bob sends a reply to Alice
+      var fromBob = await encryptMessageV1(
+          bobKeys,
+          aliceContact.v1.keyBundle,
+          xmtp.EncodedContent(
+            type: contentTypeText,
+            fallback: "oh, hello Alice!",
+            content: utf8.encode("oh, hello Alice!"),
+          ));
+      await _sendDirectMessageV1(bobApi, bobAddress, aliceAddress, fromBob);
+
+      // wait a couple seconds then close all subscriptions
+      await Future.delayed(const Duration(seconds: 1));
+
+      // then close all subscriptions
+      await Future.wait(subscription.values.map((sub) => sub.cancel()));
+
+      debugPrint("transcript:\n${transcript.join("\n")}");
+
+      expect(transcript, [
+        "$aliceAddress> hello Bob, it's me Alice!",
+        "$bobAddress> oh, hello Alice!",
+      ]);
+    },
+  );
+
+  // This connects to the dev network to test decrypting DMs from the JS client.
+  // NOTE: it requires a private key
+  test(
+    skip: "manual testing only",
+    "dev: v1 message reading - listing intros, decrypting DMs",
+    () async {
+      var api = Api.create(
+        host: 'dev.xmtp.network',
+        port: 5556,
+        isSecure: true,
+        debugLogRequests: true,
+      );
+
+      var alice = EthPrivateKey.fromHex("... put private key here...");
+
+      var walletAddress = alice.address.hexEip55;
+      var encryptedKeys = (await _lookupPrivateKeys(api, walletAddress)).first;
+      var keys = await alice.enableIdentityLoading(encryptedKeys);
+      var intros = await _lookupIntros(api, walletAddress);
+
+      // Gather all the V1 peers
+      var peers = intros.expand((intro) {
+        var header = xmtp.MessageHeaderV1.fromBuffer(intro.v1.headerBytes);
+        var sender = header.sender.identityKey
+            .recoverWalletSignerPublicKey()
+            .toEthereumAddress();
+        var recipient = header.recipient.identityKey
+            .recoverWalletSignerPublicKey()
+            .toEthereumAddress();
+        return [
+          sender.hexEip55,
+          recipient.hexEip55,
+        ];
+      }).toSet() // This remove duplicates.
+        ..remove(walletAddress);
+
+      // List the DMs with each of the peers.
+      for (var peer in peers) {
+        debugPrint("dm w/ $peer");
+        var dms = await _lookupDirectMessageV1s(api, alice.address.hexEip55, peer);
+        for (var j = 0; j < dms.length; ++j) {
+          var dm = dms[j];
+          var encoded = await decryptMessageV1(dm.v1, keys);
+          var header = xmtp.MessageHeaderV1.fromBuffer(dm.v1.headerBytes);
+          var sender = header.sender.identityKey
+              .recoverWalletSignerPublicKey()
+              .toEthereumAddress();
+          var text = utf8.decode(encoded.content); // todo: use codecs
+          debugPrint("${header.timestamp} ${sender.hexEip55}> $text");
+        }
+      }
+    },
+  );
 }
+
 
 // Helpers
 // TODO: fold these into the eventual Client
+
+Future<List<xmtp.Message>> _lookupIntros(
+  Api api,
+  String walletAddress,
+) async {
+  var listing = await api.client.query(xmtp.QueryRequest(
+    contentTopics: [Topic.userIntro(walletAddress)],
+    // pagingInfo: xmtp.PagingInfo()
+  ));
+  return listing.envelopes
+      .map((e) => xmtp.Message.fromBuffer(e.message))
+      .toList();
+}
+
+Future<List<xmtp.Message>> _lookupDirectMessageV1s(
+  Api api,
+  String senderAddress,
+  String recipientAddress,
+) async {
+  var listing = await api.client.query(xmtp.QueryRequest(
+    contentTopics: [Topic.directMessageV1(senderAddress, recipientAddress)],
+    pagingInfo: xmtp.PagingInfo(
+      direction: xmtp.SortDirection.SORT_DIRECTION_ASCENDING,
+    )
+  ));
+  return listing.envelopes
+      .map((e) => xmtp.Message.fromBuffer(e.message))
+      .toList();
+}
+
+Future<xmtp.PublishResponse> _sendDirectMessageV1(
+  Api api,
+  String senderAddress,
+  String recipientAddress,
+  xmtp.MessageV1 msg,
+) async {
+  var res = api.client.publish(xmtp.PublishRequest(envelopes: [
+    xmtp.Envelope(
+      contentTopic: Topic.directMessageV1(senderAddress, recipientAddress),
+      timestampNs: Int64(DateTime.now().millisecondsSinceEpoch) * 1000000,
+      message: xmtp.Message(v1: msg).writeToBuffer(),
+    ),
+  ]));
+  await Future.delayed(const Duration(milliseconds: 500));
+  return res;
+}
+
+Future<xmtp.PublishResponse> _sendIntroV1(
+  Api api,
+  String walletAddress,
+  xmtp.MessageV1 msg,
+) async {
+  var res = api.client.publish(xmtp.PublishRequest(envelopes: [
+    xmtp.Envelope(
+      contentTopic: Topic.userIntro(walletAddress),
+      timestampNs: Int64(DateTime.now().millisecondsSinceEpoch) * 1000000,
+      message: xmtp.Message(v1: msg).writeToBuffer(),
+    ),
+  ]));
+  await Future.delayed(const Duration(milliseconds: 500));
+  return res;
+}
 
 Future<List<xmtp.EncryptedPrivateKeyBundle>> _lookupPrivateKeys(
   Api api,

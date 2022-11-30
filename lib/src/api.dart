@@ -18,7 +18,7 @@ class Api {
     String host = '127.0.0.1',
     int port = 5556,
     bool isSecure = false,
-    bool debugLogRequests = false,
+    bool debugLogRequests = kDebugMode,
     String appVersion = "dev/0.0.0-development",
   }) {
     var channel = grpc.ClientChannel(
@@ -91,6 +91,12 @@ class _MetadataManager {
   }
 }
 
+/// If true, then the API debug logger includes the topic names
+/// requested by each API call.
+/// Note: this has no effect if the debug logger is not enabled.
+/// See `debugLogRequests` above.
+bool isDebugLoggingTopics = kDebugMode;
+
 /// This logs all API requests.
 /// See `debugLogRequests` above.
 class _DebugLogInterceptor extends grpc.ClientInterceptor {
@@ -105,6 +111,18 @@ class _DebugLogInterceptor extends grpc.ClientInterceptor {
   ) {
     final reqN = _nextReqN();
     debugPrint('xmtp: #$reqN --> ${method.path}');
+    if (isDebugLoggingTopics) {
+      if (request is xmtp.PublishRequest) {
+        for (var e in request.envelopes) {
+          debugPrint(' topic: ${e.contentTopic}');
+        }
+      }
+      if (request is xmtp.QueryRequest) {
+        for (var topic in request.contentTopics) {
+          debugPrint(' topic: $topic');
+        }
+      }
+    }
     var res = invoker(method, request, options);
     res.then((_) => debugPrint('xmtp: <-- #$reqN ${method.path}'));
     return res;
@@ -119,6 +137,11 @@ class _DebugLogInterceptor extends grpc.ClientInterceptor {
   ) {
     final reqN = _nextReqN();
     debugPrint('xmtp: #$reqN <-> ${method.path}');
+    if (isDebugLoggingTopics) {
+      requests.single.then((req) {
+        debugPrint(' topic: ${(req as xmtp.SubscribeRequest).contentTopics.first}');
+      });
+    }
     return invoker(method, requests, options);
   }
 

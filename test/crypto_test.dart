@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/crypto.dart';
@@ -26,5 +29,44 @@ void main() {
     ]);
     var decrypted = await decrypt(secret, encrypted);
     expect(decrypted, message);
+  });
+
+  test('computing shared secret', () async {
+    var alice = EthPrivateKey.createRandom(Random.secure());
+    var bob = EthPrivateKey.createRandom(Random.secure());
+
+    var aliceSecret = computeDHSecret(
+      createECPrivateKey(alice.privateKey),
+      createECPublicKey(bob.encodedPublicKey),
+    );
+    var bobSecret = computeDHSecret(
+      createECPrivateKey(bob.privateKey),
+      createECPublicKey(alice.encodedPublicKey),
+    );
+    expect(aliceSecret, bobSecret);
+  });
+
+  test('symmetric 3dh', () async {
+    var aliceId = EthPrivateKey.createRandom(Random.secure());
+    var alicePre = EthPrivateKey.createRandom(Random.secure());
+    var bobId = EthPrivateKey.createRandom(Random.secure());
+    var bobPre = EthPrivateKey.createRandom(Random.secure());
+
+    var aliceSecret = compute3DHSecret( // what Alice can see
+      createECPrivateKey(aliceId.privateKey),
+      createECPrivateKey(alicePre.privateKey),
+      createECPublicKey(bobId.encodedPublicKey),
+      createECPublicKey(bobPre.encodedPublicKey),
+      false, // Alice is not the recipient
+    );
+    var bobSecret = compute3DHSecret( // what Bob can see
+      createECPrivateKey(bobId.privateKey),
+      createECPrivateKey(bobPre.privateKey),
+      createECPublicKey(aliceId.encodedPublicKey),
+      createECPublicKey(alicePre.encodedPublicKey),
+      true, // Bob is the recipient
+    );
+
+    expect(aliceSecret, bobSecret, reason: "they should reach the same secret");
   });
 }

@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xmtp/src/signature.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/contact.dart';
@@ -43,19 +41,25 @@ void main() {
       178, 213, 204, 26, 75, 92, 233, 80, 192, 182, 201, 106,
       202, 182, 151, 44, 55, 16, 0,
     ]);
-    var contact = keyBundle.toContactBundle();
-    expect(
-      contact.wallet.hexEip55,
-      "0xb570d16466D9B35D1E96FA8bAdCe7C5c263C7c73",
-    );
-    expect(
-      contact.identity.hexEip55,
-      "0x5756f2Aa08d52111f2900c6C97b9611940620684",
-    );
-    expect(
-      contact.pre.hexEip55,
-      "0xBe658075774806ADf3E441870b1E6a4448682fec",
-    );
+    var contactV1 = createContactBundleV1(keyBundle);
+    var contactV2 = createContactBundleV2(keyBundle);
+    expect(contactV1.whichVersion(), xmtp.ContactBundle_Version.v1);
+    expect(contactV2.whichVersion(), xmtp.ContactBundle_Version.v2);
+
+    for (var contact in [contactV1, contactV2]) {
+      expect(
+        contact.wallet.hexEip55,
+        "0xb570d16466D9B35D1E96FA8bAdCe7C5c263C7c73",
+      );
+      expect(
+        contact.identity.hexEip55,
+        "0x5756f2Aa08d52111f2900c6C97b9611940620684",
+      );
+      expect(
+        contact.pre.hexEip55,
+        "0xBe658075774806ADf3E441870b1E6a4448682fec",
+      );
+    }
   });
 
   const serializedPublicKeyBundle = [

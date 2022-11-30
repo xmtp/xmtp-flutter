@@ -28,34 +28,31 @@ extension AuthCredentials on Credentials {
     // So we initiate a personal signature to "Create Identity".
     // This prompt includes an `UnsignedPublicKey` of `identity`
     // that is serialized and included in the signed message text.
-    var unsignedIdentityBytes = identity.toUnsignedPublicKey().writeToBuffer();
-    var text = SignatureText.createIdentity(unsignedIdentityBytes);
+    var unsigned = identity.toUnsignedPublicKey();
+    var text = SignatureText.createIdentity(unsigned.writeToBuffer());
     var sig = await _signPersonalMessageText(text);
-    var identityKey = xmtp.SignedPrivateKey(
-        secp256k1: xmtp.SignedPrivateKey_Secp256k1(bytes: identity.privateKey),
-        publicKey: xmtp.SignedPublicKey(
-          keyBytes: unsignedIdentityBytes,
-          signature: xmtp.Signature(
-            ecdsaCompact: sig.toEcdsaCompact(),
-          ),
-        ));
+    var identityKey = xmtp.PrivateKey(
+      secp256k1: xmtp.PrivateKey_Secp256k1(bytes: identity.privateKey),
+      publicKey: unsigned
+        ..signature = xmtp.Signature(
+          ecdsaCompact: sig.toEcdsaCompact(),
+        ),
+    );
 
     // Now we have the `identity` so we use it authorize a preKey.
     var pre = EthPrivateKey.createRandom(Random.secure());
-    var unsignedPreBytes = pre.toUnsignedPublicKey().writeToBuffer();
-    var preSig = await pre.signToSignature(unsignedPreBytes);
-    var preKey = xmtp.SignedPrivateKey(
-      secp256k1: xmtp.SignedPrivateKey_Secp256k1(bytes: pre.privateKey),
-      publicKey: xmtp.SignedPublicKey(
-        keyBytes: unsignedPreBytes,
-        signature: xmtp.Signature(
+    var unsignedPre = pre.toUnsignedPublicKey();
+    var preSig = await pre.signToSignature(unsignedPre.writeToBuffer());
+    var preKey = xmtp.PrivateKey(
+      secp256k1: xmtp.PrivateKey_Secp256k1(bytes: pre.privateKey),
+      publicKey: unsignedPre
+        ..signature = xmtp.Signature(
           ecdsaCompact: preSig.toEcdsaCompact(),
         ),
-      ),
     );
 
     return xmtp.PrivateKeyBundle(
-      v2: xmtp.PrivateKeyBundleV2(
+      v1: xmtp.PrivateKeyBundleV1(
         identityKey: identityKey,
         preKeys: [preKey],
       ),
@@ -103,10 +100,10 @@ extension AuthCredentials on Credentials {
 /// This adds a helper to [EthPrivateKey] to
 /// build the corresponding [xmtp.UnsignedPublicKey].
 extension ToUnsignedPublicKey on EthPrivateKey {
-  xmtp.UnsignedPublicKey toUnsignedPublicKey() {
-    return xmtp.UnsignedPublicKey(
-      createdNs: _nowNs(),
-      secp256k1Uncompressed: xmtp.UnsignedPublicKey_Secp256k1Uncompressed(
+  xmtp.PublicKey toUnsignedPublicKey() {
+    return xmtp.PublicKey(
+      timestamp: _nowMs(),
+      secp256k1Uncompressed: xmtp.PublicKey_Secp256k1Uncompressed(
         // NOTE: The 0x04 prefix indicates that it is uncompressed.
         bytes: [0x04] + encodedPublicKey,
       ),
@@ -120,6 +117,7 @@ extension ToUnsignedPublicKey on EthPrivateKey {
 /// This extension handles the compatibility logic required
 /// to support both V1 and V2 of PrivateKeyBundle.
 ///
+/// TODO: roll this into a "PrivateKeyBundle" helper class
 extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
   /// This returns the wallet that authorized this "identity"
   EthereumAddress get wallet {
@@ -161,10 +159,66 @@ extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
           .toList();
     }
   }
+
+  /// Get the preKey with the specified `address`.
+  /// Throws an error when it cannot be found.
+  EthPrivateKey getPre(EthereumAddress address) {
+    for (var preKey in preKeys) {
+      if (preKey.address == address) {
+        return preKey;
+      }
+    }
+    throw "unable to find preKey ${address.hexEip55}";
+  }
+
+  /// Create the v1 bundle for these keys.
+  xmtp.PrivateKeyBundleV1 toV1() {
+    if (whichVersion() == xmtp.PrivateKeyBundle_Version.v1) {
+      return v1;
+    }
+    var unsignedPublic = xmtp.UnsignedPublicKey.fromBuffer(v2.identityKey.publicKey.keyBytes);
+    return xmtp.PrivateKeyBundleV1(
+        identityKey: xmtp.PrivateKey(
+            timestamp: v2.identityKey.createdNs ~/ 1000000,
+            secp256k1: xmtp.PrivateKey_Secp256k1(
+              bytes: v2.identityKey.secp256k1.bytes,
+            ),
+            publicKey: xmtp.PublicKey(
+              timestamp: unsignedPublic.createdNs,
+              secp256k1Uncompressed: xmtp.PublicKey_Secp256k1Uncompressed(
+                bytes: unsignedPublic.secp256k1Uncompressed.bytes,
+              ),
+              signature: v2.identityKey.publicKey.signature,
+            )));
+  }
+
+  /// Create the v2 bundle for these keys.
+  xmtp.PrivateKeyBundleV2 toV2() {
+    if (whichVersion() == xmtp.PrivateKeyBundle_Version.v2) {
+      return v2;
+    }
+    return xmtp.PrivateKeyBundleV2(
+        identityKey: xmtp.SignedPrivateKey(
+      createdNs: v1.identityKey.timestamp * 1000000,
+      secp256k1: xmtp.SignedPrivateKey_Secp256k1(
+        bytes: v1.identityKey.secp256k1.bytes,
+      ),
+      publicKey: xmtp.SignedPublicKey(
+        keyBytes: xmtp.PublicKey(
+          timestamp: v1.identityKey.publicKey.timestamp,
+          secp256k1Uncompressed: v1.identityKey.publicKey.secp256k1Uncompressed,
+          // NOTE: the keyBytes that was signed does not include the .signature
+        ).writeToBuffer(),
+        signature: v1.identityKey.publicKey.signature,
+      ),
+    ));
+  }
 }
 
 /// This enhances the [xmtp.PrivateKeyBundle] so it can produce
 /// auth tokens for use with the API.
+///
+/// TODO: roll this into a "PrivateKeyBundle" helper class
 extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
   /// Creates an authorization token that bundles
   ///  - the authorized identity (signed by the wallet key) and
@@ -173,16 +227,14 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
   /// This is used for authentication with the API.
   ///  e.g. it is sent as the "authorization: Bearer $authToken".
   ///
-  /// NOTE: this can only be called on v2 bundles.
-  /// TODO: consider supporting V1 key bundles
-  /// TODO: consider adding a converter ".toV2()" for V1 instances
-  /// TODO: more compatibility testing
+  /// NOTE: this can only be called on v1 bundles.
+  /// TODO: consider supporting V2 key bundles
   Future<String> createAuthToken() async {
-    if (whichVersion() != xmtp.PrivateKeyBundle_Version.v2) {
-      throw "only supported on xmtp.PrivateKeyBundle v2";
+    if (whichVersion() != xmtp.PrivateKeyBundle_Version.v1) {
+      throw "only supported on xmtp.PrivateKeyBundle v1";
     }
 
-    var walletAddr = v2.identityKey.publicKey
+    var walletAddr = v1.identityKey.publicKey
         .recoverWalletSignerPublicKey()
         .toEthereumAddress()
         .hexEip55;
@@ -190,20 +242,12 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
     var authDataBytes = authData.writeToBuffer();
 
     var identityPrivateKey =
-        bytesToUnsignedInt(Uint8List.fromList(v2.identityKey.secp256k1.bytes));
+        bytesToUnsignedInt(Uint8List.fromList(v1.identityKey.secp256k1.bytes));
     var identity = EthPrivateKey.fromInt(identityPrivateKey);
     var sig = await identity.signToSignature(authDataBytes);
 
-    var identityPublicKey =
-        xmtp.UnsignedPublicKey.fromBuffer(v2.identityKey.publicKey.keyBytes);
     var token = xmtp.Token(
-      identityKey: xmtp.PublicKey(
-        timestamp: identityPublicKey.createdNs,
-        secp256k1Uncompressed: xmtp.PublicKey_Secp256k1Uncompressed(
-          bytes: identityPublicKey.secp256k1Uncompressed.bytes,
-        ),
-        signature: v2.identityKey.publicKey.signature,
-      ),
+      identityKey: v1.identityKey.publicKey,
       authDataBytes: authDataBytes,
       authDataSignature: xmtp.Signature(
         ecdsaCompact: sig.toEcdsaCompact(),
@@ -214,3 +258,4 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
 }
 
 Int64 _nowNs() => Int64(DateTime.now().millisecondsSinceEpoch) * 1000000;
+Int64 _nowMs() => Int64(DateTime.now().millisecondsSinceEpoch);
