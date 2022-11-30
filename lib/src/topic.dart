@@ -11,16 +11,17 @@ class Topic {
 
   /// This represents direct message conversation between `sender` and `recipient`.
   /// NOTE: the addresses are normalized (EIP-55) and then sorted.
-  static String directMessage(String sender, String recipient) =>
-      _content('dm-${[
-        _normalize(sender),
-        _normalize(recipient),
-      ]
-        ..sort()
-        ..join('-')}');
+  static String directMessageV1(String senderAddress, String recipientAddress) {
+    var addresses = [
+      _normalize(senderAddress),
+      _normalize(recipientAddress),
+    ];
+    addresses.sort();
+    return _content('dm-${addresses.join('-')}');
+  }
 
-  /// This represents a direct message conversation.
-  static String directMessageV2(String randomString) =>
+  /// This represents a message conversation.
+  static String messageV2(String randomString) =>
       _content('m-$randomString');
 
   /// This represents a published contact for the user.

@@ -93,31 +93,53 @@ extension CompatContactBundle on xmtp.ContactBundle {
   }
 }
 
-/// This adds a helper to [xmtp.PrivateKeyBundle] to construct
-/// the corresponding [xmtp.ContactBundle] which is basically
-/// the same bundle without the private keys.
-extension ToContactPrivateKeyBundle on xmtp.PrivateKeyBundle {
-  xmtp.ContactBundle toContactBundle() {
-    if (whichVersion() == xmtp.PrivateKeyBundle_Version.v1) {
-      return xmtp.ContactBundle(
-        v1: xmtp.ContactBundleV1(
-          keyBundle: xmtp.PublicKeyBundle(
-            identityKey: v1.identityKey.publicKey,
-            preKey: v1.preKeys.first.publicKey,
-          ),
-        ),
-      );
-    } else {
-      return xmtp.ContactBundle(
-        v2: xmtp.ContactBundleV2(
-          keyBundle: xmtp.SignedPublicKeyBundle(
-            identityKey: v2.identityKey.publicKey,
-            preKey: v2.preKeys.first.publicKey,
-          ),
-        ),
-      );
-    }
-  }
+xmtp.PublicKey _toPublicKey(xmtp.SignedPublicKey v2) =>
+    // This works because v1 `PublicKey` ~= v2 `UnsignedPublicKey`
+    xmtp.PublicKey.fromBuffer(v2.keyBytes)..signature = v2.signature;
+
+xmtp.SignedPublicKey _toSignedPublicKey(xmtp.PublicKey v1) =>
+    xmtp.SignedPublicKey(
+      signature: v1.signature,
+      // This works because v1 `PublicKey` ~= v2 `UnsignedPublicKey`
+      keyBytes: xmtp.PublicKey(
+        timestamp: v1.timestamp,
+        secp256k1Uncompressed: v1.secp256k1Uncompressed,
+        // NOTE: the keyBytes that was signed does not include the .signature
+      ).writeToBuffer(),
+    );
+
+/// This creates a [v1] [xmtp.ContactBundle] from a [xmtp.PrivateKeyBundle].
+xmtp.ContactBundle createContactBundleV1(xmtp.PrivateKeyBundle keys) {
+  var isAlreadyV1 = keys.whichVersion() == xmtp.PrivateKeyBundle_Version.v1;
+  return xmtp.ContactBundle(
+    v1: xmtp.ContactBundleV1(
+      keyBundle: xmtp.PublicKeyBundle(
+        identityKey: isAlreadyV1
+            ? keys.v1.identityKey.publicKey
+            : _toPublicKey(keys.v2.identityKey.publicKey),
+        preKey: isAlreadyV1
+            ? keys.v1.preKeys.first.publicKey
+            : _toPublicKey(keys.v2.preKeys.first.publicKey),
+      ),
+    ),
+  );
+}
+
+/// This creates a [v2] [xmtp.ContactBundle] from a [xmtp.PrivateKeyBundle].
+xmtp.ContactBundle createContactBundleV2(xmtp.PrivateKeyBundle keys) {
+  var isAlreadyV2 = keys.whichVersion() == xmtp.PrivateKeyBundle_Version.v2;
+  return xmtp.ContactBundle(
+    v2: xmtp.ContactBundleV2(
+      keyBundle: xmtp.SignedPublicKeyBundle(
+        identityKey: isAlreadyV2
+          ? keys.v2.identityKey.publicKey
+          : _toSignedPublicKey(keys.v1.identityKey.publicKey),
+        preKey: isAlreadyV2
+          ? keys.v2.preKeys.first.publicKey
+          : _toSignedPublicKey(keys.v1.preKeys.first.publicKey),
+      ),
+    ),
+  );
 }
 
 /// This adds a helper to [List<int>] to simplify
