@@ -6,13 +6,14 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/web3dart.dart';
-import 'package:xmtp/src/signature.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/api.dart';
 import 'package:xmtp/src/auth.dart';
 import 'package:xmtp/src/contact.dart';
 import 'package:xmtp/src/content.dart';
+import 'package:xmtp/src/crypto.dart';
+import 'package:xmtp/src/signature.dart';
 import 'package:xmtp/src/topic.dart';
 
 void main() {
@@ -396,7 +397,8 @@ void main() {
       // List the DMs with each of the peers.
       for (var peer in peers) {
         debugPrint("dm w/ $peer");
-        var dms = await _lookupDirectMessageV1s(api, alice.address.hexEip55, peer);
+        var dms =
+            await _lookupDirectMessageV1s(api, alice.address.hexEip55, peer);
         for (var j = 0; j < dms.length; ++j) {
           var dm = dms[j];
           var encoded = await decryptMessageV1(dm.v1, keys);
@@ -410,11 +412,214 @@ void main() {
       }
     },
   );
-}
 
+  // This creates 2 users connected to the API and sends DMs
+  // back and forth using message API V2.
+  test(
+    skip: "manual testing only",
+    "v2 messaging: invites, reading, writing, streaming",
+    () async {
+      // Setup the API clients.
+      var aliceApi = Api.create(host: '127.0.0.1', port: 5556, isSecure: false);
+      var bobApi = Api.create(host: '127.0.0.1', port: 5556, isSecure: false);
+
+      // setup Alice's account and API session
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceIdentity = EthPrivateKey.createRandom(Random.secure());
+      var aliceKeys = await aliceWallet.createIdentity(aliceIdentity);
+      var aliceAuthToken = await aliceKeys.createAuthToken();
+      aliceApi.setAuthToken(aliceAuthToken);
+      await _saveContact(
+        aliceApi,
+        aliceWallet.address.hexEip55,
+        createContactBundleV2(aliceKeys),
+      );
+
+      // setup Bob's account and API session
+      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobIdentity = EthPrivateKey.createRandom(Random.secure());
+      var bobKeys = await bobWallet.createIdentity(bobIdentity);
+      var bobAuthToken = await bobKeys.createAuthToken();
+      bobApi.setAuthToken(bobAuthToken);
+      await _saveContact(
+        bobApi,
+        bobWallet.address.hexEip55,
+        createContactBundleV2(bobKeys),
+      );
+
+      // Load their contacts
+      var aliceAddress = aliceWallet.address.hexEip55;
+      var bobAddress = bobWallet.address.hexEip55;
+      var aliceContact = (await _lookupContact(aliceApi, aliceAddress)).first;
+      var bobContact = (await _lookupContact(bobApi, bobAddress)).first;
+
+      expect(aliceContact.whichVersion(), xmtp.ContactBundle_Version.v2);
+      expect(bobContact.whichVersion(), xmtp.ContactBundle_Version.v2);
+
+      // Gather subscriptions here so we can clean them up later.
+      //  map of { topic -> subscription }
+      Map<String, StreamSubscription<xmtp.Envelope>> subscription = {};
+
+      // We'll log the transcript here
+      var transcript = [];
+      // This creates a transcript recorder that listens to invites + messages.
+      createRecorder(
+        EthPrivateKey wallet,
+        Api api,
+        xmtp.PrivateKeyBundle keys,
+      ) =>
+          (e) async {
+            var invite = xmtp.SealedInvitation.fromBuffer(e.message);
+            var decrypted = await decryptInviteV1(invite.v1, keys);
+            var topic = decrypted.topic;
+            var secret = decrypted.aes256GcmHkdfSha256.keyMaterial;
+            debugPrint("${wallet.address} was invited to $topic");
+            // Now subscribe to the DMs with this peer.
+            subscription[topic] ??= api.client
+                .subscribe(xmtp.SubscribeRequest(contentTopics: [topic]))
+                .listen((e) async {
+              var msg = xmtp.Message.fromBuffer(e.message);
+              var decryptedBytes = await decrypt(
+                secret,
+                msg.v2.ciphertext,
+                aad: msg.v2.headerBytes,
+              );
+              var signed = xmtp.SignedContent.fromBuffer(decryptedBytes);
+              var sender = signed.sender.identityKey
+                  .recoverWalletSignerPublicKey()
+                  .toEthereumAddress();
+              var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
+              var text = utf8.decode(encoded.content); // todo: use codecs
+              transcript.add("${sender.hexEip55}> $text");
+            });
+          };
+
+      // This attaches transcript recorders to Alice and Bobs invites + msgs.
+      var bobInvites = Topic.userInvite(bobAddress);
+      subscription[bobInvites] ??= bobApi.client
+          .subscribe(xmtp.SubscribeRequest(contentTopics: [bobInvites]))
+          .listen(createRecorder(bobWallet, bobApi, bobKeys));
+      var aliceInvites = Topic.userInvite(aliceAddress);
+      subscription[aliceInvites] ??= aliceApi.client
+          .subscribe(xmtp.SubscribeRequest(contentTopics: [aliceInvites]))
+          .listen(createRecorder(aliceWallet, aliceApi, aliceKeys));
+
+      // Wait a beat to make sure the subscriptions are live.
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Create the new conversation.
+      var invite = createInviteV1(xmtp.InvitationV1_Context(
+        conversationId: "https://example.com/1",
+        metadata: {"foo": "bar"},
+      ));
+      var sealed = await encryptInviteV1(
+        aliceKeys,
+        bobContact.v2.keyBundle,
+        invite,
+      );
+      // Send the invite to both Alice and Bob.
+      await _sendInviteV1(aliceApi, aliceAddress, sealed);
+      await _sendInviteV1(aliceApi, bobAddress, sealed);
+
+      // Send a message from Alice
+      await _sendMessageV2(
+          aliceApi,
+          invite.topic,
+          await encryptMessageV2(
+            aliceKeys,
+            invite,
+            xmtp.EncodedContent(
+              type: contentTypeText,
+              fallback: "hello Bob, it's me Alice!",
+              content: utf8.encode("hello Bob, it's me Alice!"),
+            ),
+          ));
+
+      // Send a message from Bob
+      await _sendMessageV2(
+          bobApi,
+          invite.topic,
+          await encryptMessageV2(
+            bobKeys,
+            invite,
+            xmtp.EncodedContent(
+              type: contentTypeText,
+              fallback: "oh, hello Alice!",
+              content: utf8.encode("oh, hello Alice!"),
+            ),
+          ));
+
+      // wait a beat then close all subscriptions
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      // then close all subscriptions
+      await Future.wait(subscription.values.map((sub) => sub.cancel()));
+
+      debugPrint("transcript:\n${transcript.join("\n")}");
+
+      expect(transcript, [
+        "$aliceAddress> hello Bob, it's me Alice!",
+        "$bobAddress> oh, hello Alice!",
+      ]);
+    },
+  );
+
+  // This connects to the dev network to test decrypting v2 messages
+  // NOTE: it requires a private key
+  test(
+    skip: "manual testing only",
+    "dev: v2 message reading - listing invites, decrypting messages",
+    () async {
+      var api = Api.create(
+        host: 'dev.xmtp.network',
+        port: 5556,
+        isSecure: true,
+        debugLogRequests: true,
+      );
+
+      var alice = EthPrivateKey.fromHex("... private key ...");
+
+      var walletAddress = alice.address.hexEip55;
+      var encryptedKeys = (await _lookupPrivateKeys(api, walletAddress)).first;
+      var keys = await alice.enableIdentityLoading(encryptedKeys);
+      var invites = await _lookupInvites(api, walletAddress);
+      debugPrint("invites ${invites.length}");
+      for (var i = 0; i < invites.length; ++i) {
+        var encrypted = invites[i];
+        var invite = await decryptInviteV1(encrypted.v1, keys);
+        var topic = invite.topic;
+        debugPrint("[$i] ${invite.topic}");
+        var msgs = await _lookupMessageV2s(api, topic);
+        for (var j = 0; j < msgs.length; ++j) {
+          var msg = msgs[j];
+          var signed = await decryptMessageV2(msg.v2, invite);
+          var sender = signed.sender.identityKey
+              .recoverWalletSignerPublicKey()
+              .toEthereumAddress();
+          var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
+          var text = utf8.decode(encoded.content);
+          debugPrint("[$i][$j] ${sender.hexEip55}> $text");
+        }
+      }
+    },
+  );
+}
 
 // Helpers
 // TODO: fold these into the eventual Client
+
+Future<List<xmtp.SealedInvitation>> _lookupInvites(
+  Api api,
+  String walletAddress,
+) async {
+  var listing = await api.client.query(xmtp.QueryRequest(
+    contentTopics: [Topic.userInvite(walletAddress)],
+    // pagingInfo: xmtp.PagingInfo()
+  ));
+  return listing.envelopes
+      .map((e) => xmtp.SealedInvitation.fromBuffer(e.message))
+      .toList();
+}
 
 Future<List<xmtp.Message>> _lookupIntros(
   Api api,
@@ -429,17 +634,30 @@ Future<List<xmtp.Message>> _lookupIntros(
       .toList();
 }
 
+Future<List<xmtp.Message>> _lookupMessageV2s(
+  Api api,
+  String topic,
+) async {
+  var listing = await api.client.query(xmtp.QueryRequest(
+      contentTopics: [topic],
+      pagingInfo: xmtp.PagingInfo(
+        direction: xmtp.SortDirection.SORT_DIRECTION_ASCENDING,
+      )));
+  return listing.envelopes
+      .map((e) => xmtp.Message.fromBuffer(e.message))
+      .toList();
+}
+
 Future<List<xmtp.Message>> _lookupDirectMessageV1s(
   Api api,
   String senderAddress,
   String recipientAddress,
 ) async {
   var listing = await api.client.query(xmtp.QueryRequest(
-    contentTopics: [Topic.directMessageV1(senderAddress, recipientAddress)],
-    pagingInfo: xmtp.PagingInfo(
-      direction: xmtp.SortDirection.SORT_DIRECTION_ASCENDING,
-    )
-  ));
+      contentTopics: [Topic.directMessageV1(senderAddress, recipientAddress)],
+      pagingInfo: xmtp.PagingInfo(
+        direction: xmtp.SortDirection.SORT_DIRECTION_ASCENDING,
+      )));
   return listing.envelopes
       .map((e) => xmtp.Message.fromBuffer(e.message))
       .toList();
@@ -472,6 +690,38 @@ Future<xmtp.PublishResponse> _sendIntroV1(
       contentTopic: Topic.userIntro(walletAddress),
       timestampNs: Int64(DateTime.now().millisecondsSinceEpoch) * 1000000,
       message: xmtp.Message(v1: msg).writeToBuffer(),
+    ),
+  ]));
+  await Future.delayed(const Duration(milliseconds: 500));
+  return res;
+}
+
+Future<xmtp.PublishResponse> _sendMessageV2(
+  Api api,
+  String topic,
+  xmtp.MessageV2 msg,
+) async {
+  var res = api.client.publish(xmtp.PublishRequest(envelopes: [
+    xmtp.Envelope(
+      contentTopic: topic,
+      timestampNs: Int64(DateTime.now().millisecondsSinceEpoch) * 1000000,
+      message: xmtp.Message(v2: msg).writeToBuffer(),
+    ),
+  ]));
+  await Future.delayed(const Duration(milliseconds: 500));
+  return res;
+}
+
+Future<xmtp.PublishResponse> _sendInviteV1(
+  Api api,
+  String walletAddress,
+  xmtp.SealedInvitation sealed,
+) async {
+  var res = api.client.publish(xmtp.PublishRequest(envelopes: [
+    xmtp.Envelope(
+      contentTopic: Topic.userInvite(walletAddress),
+      timestampNs: Int64(DateTime.now().millisecondsSinceEpoch) * 1000000,
+      message: sealed.writeToBuffer(),
     ),
   ]));
   await Future.delayed(const Duration(milliseconds: 500));
