@@ -11,6 +11,12 @@ final _aesGcm256 = AesGcm.with256bits(nonceLength: 12);
 
 final ECDomainParameters _params = ECCurve_secp256k1();
 
+/// This returns the sha256 hash of the input.
+Future<List<int>> sha256(List<int> input) async {
+  var result = await Sha256().hash(input);
+  return result.bytes;
+}
+
 /// This uses the `secret` to encrypt the `message`.
 Future<xmtp.Ciphertext> encrypt(
   List<int> secret,
