@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
-import 'package:xmtp/src/crypto.dart';
+import 'package:xmtp/src/common/crypto.dart';
 
 void main() {
   test('codec', () async {
@@ -52,14 +52,16 @@ void main() {
     var bobId = EthPrivateKey.createRandom(Random.secure());
     var bobPre = EthPrivateKey.createRandom(Random.secure());
 
-    var aliceSecret = compute3DHSecret( // what Alice can see
+    var aliceSecret = compute3DHSecret(
+      // what Alice can see
       createECPrivateKey(aliceId.privateKey),
       createECPrivateKey(alicePre.privateKey),
       createECPublicKey(bobId.encodedPublicKey),
       createECPublicKey(bobPre.encodedPublicKey),
       false, // Alice is not the recipient
     );
-    var bobSecret = compute3DHSecret( // what Bob can see
+    var bobSecret = compute3DHSecret(
+      // what Bob can see
       createECPrivateKey(bobId.privateKey),
       createECPrivateKey(bobPre.privateKey),
       createECPublicKey(aliceId.encodedPublicKey),

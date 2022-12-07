@@ -1,8 +1,84 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
+import 'package:quiver/collection.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
-import './signature.dart';
+import 'auth.dart';
+import 'common/api.dart';
+import 'common/signature.dart';
+import 'common/time64.dart';
+import 'common/topic.dart';
+
+/// This manages the contacts for the user's session.
+///
+/// It is responsible for loading contacts from the server.
+/// See [getUserContacts].
+///
+/// And it is responsible for saving the user's contact to the server.
+/// See [saveContact].
+class ContactManager {
+  final Api _api;
+  final Multimap<String, xmtp.ContactBundle> _contacts;
+
+  ContactManager(this._api) : _contacts = Multimap();
+
+  Future<List<xmtp.ContactBundle>> getUserContacts(
+    String walletAddress,
+  ) async {
+    walletAddress = EthereumAddress.fromHex(walletAddress).hexEip55;
+    if (_contacts.containsKey(walletAddress)) {
+      return _contacts[walletAddress].toList();
+    }
+    var stored = await _api.client.query(xmtp.QueryRequest(
+      contentTopics: [Topic.userContact(walletAddress)],
+      pagingInfo: xmtp.PagingInfo(limit: 5),
+    ));
+    var results = stored.envelopes.map((e) => e.toContactBundle()).where(
+          // Ignore invalid results for the wrong address.
+          (result) => result.wallet.hexEip55 == walletAddress,
+        );
+    _contacts.removeAll(walletAddress);
+    _contacts.addValues(walletAddress, results);
+    return results.toList();
+  }
+
+  Future<xmtp.ContactBundle> getUserContactV1(String walletAddress) async {
+    var peerContacts = await getUserContacts(walletAddress);
+    return peerContacts.firstWhere((c) => c.hasV1());
+  }
+
+  Future<xmtp.ContactBundle> getUserContactV2(String walletAddress) async {
+    var peerContacts = await getUserContacts(walletAddress);
+    return peerContacts.firstWhere((c) => c.hasV2());
+  }
+
+  Future<xmtp.PublishResponse> saveContact(
+    xmtp.PrivateKeyBundle keys, {
+    bool includeV1 = true,
+    bool includeV2 = true,
+  }) async {
+    List<xmtp.ContactBundle> bundles = [];
+    if (includeV1) {
+      bundles.add(createContactBundleV1(keys));
+    }
+    if (includeV2) {
+      bundles.add(createContactBundleV2(keys));
+    }
+    var address = keys.wallet;
+    _contacts.removeAll(address.hexEip55);
+    _contacts.addValues(address.hexEip55, bundles);
+    return _api.client.publish(xmtp.PublishRequest(
+      envelopes: bundles.map(
+        (bundle) => xmtp.Envelope(
+          contentTopic: Topic.userContact(address.hexEip55),
+          timestampNs: nowNs(),
+          message: bundle.writeToBuffer(),
+        ),
+      ),
+    ));
+  }
+}
 
 /// This adds a helper to [xmtp.Envelope] to help when
 /// decoding [xmtp.ContactBundle]s from the "contact-{address}" topic.
@@ -132,30 +208,12 @@ xmtp.ContactBundle createContactBundleV2(xmtp.PrivateKeyBundle keys) {
     v2: xmtp.ContactBundleV2(
       keyBundle: xmtp.SignedPublicKeyBundle(
         identityKey: isAlreadyV2
-          ? keys.v2.identityKey.publicKey
-          : _toSignedPublicKey(keys.v1.identityKey.publicKey),
+            ? keys.v2.identityKey.publicKey
+            : _toSignedPublicKey(keys.v1.identityKey.publicKey),
         preKey: isAlreadyV2
-          ? keys.v2.preKeys.first.publicKey
-          : _toSignedPublicKey(keys.v1.preKeys.first.publicKey),
+            ? keys.v2.preKeys.first.publicKey
+            : _toSignedPublicKey(keys.v1.preKeys.first.publicKey),
       ),
     ),
   );
-}
-
-/// This adds a helper to [List<int>] to simplify
-/// conversion to [EthereumAddress].
-///
-/// TODO: consider moving this extension elsewhere w/ other eth utils.
-extension EthAddressBytes on List<int> {
-  EthereumAddress toEthereumAddress() {
-    var publicKey = Uint8List.fromList(this);
-    if (publicKey.length == 65 && publicKey[0] == 0x04) {
-      // Skip the uncompressed indicator prefix.
-      publicKey = publicKey.sublist(1);
-    }
-    if (publicKey.length != 64) {
-      throw "bad public key $publicKey";
-    }
-    return EthereumAddress.fromPublicKey(publicKey);
-  }
 }

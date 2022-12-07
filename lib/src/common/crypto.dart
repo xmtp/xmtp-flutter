@@ -54,7 +54,7 @@ Future<List<int>> decrypt(
   List<int> aad = const <int>[],
 }) async {
   if (!ciphertext.hasAes256GcmHkdfSha256()) {
-    throw UnsupportedError("unsupported ciphertext");
+    throw StateError("unsupported ciphertext");
   }
   var p = ciphertext.aes256GcmHkdfSha256;
   final hkdf = Hkdf(
@@ -105,8 +105,7 @@ Uint8List compute3DHSecret(
 }
 
 /// This creates an [ECPublicKey] from the raw secp256k1 public key `bytes`.
-ECPublicKey createECPublicKey(List<int> bytes) =>
-    ECPublicKey(
+ECPublicKey createECPublicKey(List<int> bytes) => ECPublicKey(
     _params.curve.decodePoint(
         // Add the 0x04 byte prefix if it's missing.
         // The prefix indicates that it is uncompressed.

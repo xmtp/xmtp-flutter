@@ -1,8 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:web3dart/credentials.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
+
+/// This contains the XMTP signature texts and related utilities.
 
 /// These are the texts that users are prompted to sign.
 ///
@@ -48,7 +51,7 @@ extension ToMsgSignature on xmtp.Signature {
         ? walletEcdsaCompact.bytes
         : ecdsaCompact.bytes;
     if (bytes.length != 64) {
-      throw 'bad wallet signature length (${bytes.length})';
+      throw StateError('bad wallet signature length (${bytes.length})');
     }
     var r = bytesToUnsignedInt(Uint8List.fromList(bytes.sublist(0, 32)));
     var s = bytesToUnsignedInt(Uint8List.fromList(bytes.sublist(32, 64)));
@@ -127,4 +130,49 @@ Uint8List ethereumHash(String text) {
   var prefix = utf8.encode('\u0019Ethereum Signed Message:\n');
   var count = utf8.encode(payload.length.toString());
   return keccak256(Uint8List.fromList(prefix + count + payload));
+}
+
+/// This adds helpers on [xmtp.PublicKeyBundle] to clean up header parsing.
+extension PKBundleToEthAddresses on xmtp.PublicKeyBundle {
+  EthereumAddress get wallet =>
+      identityKey.recoverWalletSignerPublicKey().toEthereumAddress();
+
+  EthereumAddress get identity =>
+      identityKey.secp256k1Uncompressed.bytes.toEthereumAddress();
+
+  EthereumAddress get pre =>
+      preKey.secp256k1Uncompressed.bytes.toEthereumAddress();
+}
+
+/// This adds helpers on [xmtp.SignedPublicKeyBundle] to clean up header parsing.
+extension SPKBundleToEthAddresses on xmtp.SignedPublicKeyBundle {
+  EthereumAddress get wallet =>
+      identityKey.recoverWalletSignerPublicKey().toEthereumAddress();
+
+  EthereumAddress get identity =>
+      identityKey.publicKeyBytes.toEthereumAddress();
+
+  EthereumAddress get pre => preKey.publicKeyBytes.toEthereumAddress();
+}
+
+/// This adds helper to grab the public key bytes from an [xmtp.SignedPublicKey]
+extension ToPublicKeyBytes on xmtp.SignedPublicKey {
+  List<int> get publicKeyBytes =>
+      xmtp.UnsignedPublicKey.fromBuffer(keyBytes).secp256k1Uncompressed.bytes;
+}
+
+/// This adds a helper to [List<int>] to simplify
+/// conversion to [EthereumAddress].
+extension EthAddressBytes on List<int> {
+  EthereumAddress toEthereumAddress() {
+    var publicKey = Uint8List.fromList(this);
+    if (publicKey.length == 65 && publicKey[0] == 0x04) {
+      // Skip the uncompressed indicator prefix.
+      publicKey = publicKey.sublist(1);
+    }
+    if (publicKey.length != 64) {
+      throw StateError("bad public key $publicKey");
+    }
+    return EthereumAddress.fromPublicKey(publicKey);
+  }
 }

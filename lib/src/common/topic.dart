@@ -21,8 +21,7 @@ class Topic {
   }
 
   /// This represents a message conversation.
-  static String messageV2(String randomString) =>
-      _content('m-$randomString');
+  static String messageV2(String randomString) => _content('m-$randomString');
 
   /// This represents a published contact for the user.
   static String userContact(String walletAddress) =>
