@@ -1,7 +1,15 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
+import 'package:xmtp/src/auth.dart';
+import 'package:xmtp/src/common/api.dart';
 import 'package:xmtp/src/contact.dart';
+
+import 'test_server.dart';
 
 void main() {
   test("adapting PrivateKeyBundle", () async {
@@ -92,12 +100,76 @@ void main() {
       message: xmtp.ContactBundle(
         v1: xmtp.ContactBundleV1(
             keyBundle: xmtp.PublicKeyBundle.fromBuffer(
-              serializedPublicKeyBundle,
-            )
-        ),
+          serializedPublicKeyBundle,
+        )),
       ).writeToBuffer(),
     ).toContactBundle();
 
     expect(envelopeSurprise.toContactBundle(), envelopeExpected);
   });
+
+  test(
+    skip: "manual testing only",
+    "dev: inspecting contacts for particular wallets on dev network",
+    () async {
+      // Setup the API client.
+      var api = Api.create(
+        host: 'dev.xmtp.network',
+        port: 5556,
+        isSecure: true,
+      );
+      var contacts = ContactManager(api);
+      for (var address in [
+        "0x359B0ceb2daBcBB6588645de3B480c8203aa5b76", // dmccartney.eth
+        "0xf0EA7663233F99D0c12370671abBb6Cca980a490", // saulmc.eth
+        "0x66942eC8b0A6d0cff51AEA9C7fd00494556E705F", // anoopr.eth
+      ]) {
+        var cs = await contacts.getUserContacts(address);
+        debugPrint("$address has ${cs.length} published contacts");
+        for (var i = 0; i < cs.length; ++i) {
+          var c = cs[i];
+          var wallet = c.wallet.hexEip55;
+          var identity = c.identity.hexEip55;
+          var pre = c.hasPre ? c.pre.hexEip55 : "(none)";
+          debugPrint("[$i] ${c.whichVersion()}: wallet $wallet");
+          debugPrint(" -> identity $identity");
+          debugPrint("  -> pre $pre");
+          expect(c.wallet.hexEip55, address);
+        }
+      }
+    },
+  );
+
+  test(
+    skip: !testServerEnabled,
+    "contact creation / loading",
+    () async {
+      // Setup the API client.
+      var api = createTestServerApi();
+      var contacts = ContactManager(api);
+      var alice = EthPrivateKey.createRandom(Random.secure());
+
+      // First lookup if she has a contact (i.e. if she has an account)
+      var stored = await contacts.getUserContacts(alice.address.hexEip55);
+      expect(stored.length, 0); // nope, no account
+
+      // So we create an identity and authenticate
+      var keys = await AuthManager(alice.address, api)
+          .authenticateWithCredentials(alice);
+
+      // And then we save the contact for that new identity.
+      await contacts.saveContact(keys);
+
+      // Now when we lookup alice again, she should have
+      // both a v1 and a v2 contact.
+      stored = await contacts.getUserContacts(alice.address.hexEip55);
+      expect(stored.length, 2);
+      var storedV1 = await contacts.getUserContactV1(alice.address.hexEip55);
+      var storedV2 = await contacts.getUserContactV2(alice.address.hexEip55);
+      expect(storedV1.wallet, alice.address);
+      expect(storedV1.whichVersion(), xmtp.ContactBundle_Version.v1);
+      expect(storedV2.wallet, alice.address);
+      expect(storedV2.whichVersion(), xmtp.ContactBundle_Version.v2);
+    },
+  );
 }

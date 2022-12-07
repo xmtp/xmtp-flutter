@@ -1,15 +1,107 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
+import 'package:quiver/check.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
-import './contact.dart';
-import './crypto.dart';
-import './signature.dart';
+import 'common/crypto.dart';
+import 'common/signature.dart';
+import 'common/api.dart';
+import 'common/time64.dart';
+import 'common/topic.dart';
+
+/// This manages the [keys] for a user.
+/// It is responsible for initializing them from wallet [Credentials]
+/// or from a previously saved [xmtp.PrivateKeyBundle] keys.
+/// See [authenticateWithCredentials], [authenticateWithKeys].
+///
+/// It is also responsible for saving and loading them from the [Api].
+class AuthManager {
+  final EthereumAddress _address;
+  final Api _api;
+  late xmtp.PrivateKeyBundle keys;
+
+  AuthManager(this._address, this._api);
+
+  /// This authenticates using [keys] acquired from network storage
+  /// encrypted using the [wallet].
+  ///
+  /// e.g. this might be called the first time a user logs in from a new device.
+  ///      The next time they launch the app they can [authenticateWithKeys].
+  ///
+  /// If there are stored keys then this asks the [wallet] to
+  /// [enableIdentityLoading] so that we can decrypt the stored [keys].
+  ///
+  /// If there are no stored keys then this generates a new [identityKey]
+  /// and asks the [wallet] to both [createIdentity] and [enableIdentitySaving]
+  /// so we can then store it encrypted for the next time.
+  Future<xmtp.PrivateKeyBundle> authenticateWithCredentials(
+    Credentials wallet,
+  ) async {
+    xmtp.PrivateKeyBundle keys;
+    var storedKeys = await _lookupPrivateKeys();
+    if (storedKeys.isNotEmpty) {
+      keys = await wallet.enableIdentityLoading(storedKeys.first);
+      _checkKeys(keys);
+      var authToken = await keys.createAuthToken();
+      _api.setAuthToken(authToken);
+      return this.keys = keys;
+    } else {
+      var identity = generateKeyPair();
+      keys = await wallet.createIdentity(identity);
+      _checkKeys(keys);
+      var encryptedKeys = await wallet.enableIdentitySaving(keys);
+      var authToken = await keys.createAuthToken();
+      _api.setAuthToken(authToken);
+      await _savePrivateKeys(encryptedKeys);
+      return this.keys = keys;
+    }
+  }
+
+  /// This authenticates with [keys] directly received.
+  /// e.g. this might be called on subsequent app launches once we
+  ///      have already stored the keys from a previous session.
+  Future<xmtp.PrivateKeyBundle> authenticateWithKeys(
+    xmtp.PrivateKeyBundle keys,
+  ) async {
+    _checkKeys(keys);
+    var authToken = await keys.createAuthToken();
+    _api.setAuthToken(authToken);
+    return this.keys = keys;
+  }
+
+  /// This throws if the wallet signer of the keys does not match [address].
+  void _checkKeys(xmtp.PrivateKeyBundle keys) => checkArgument(
+        keys.wallet == _address,
+        message: "authentication keys must match client address: "
+            "${keys.wallet} <-> $_address",
+      );
+
+  Future<List<xmtp.EncryptedPrivateKeyBundle>> _lookupPrivateKeys() async {
+    var stored = await _api.client.query(xmtp.QueryRequest(
+      contentTopics: [Topic.userPrivateStoreKeyBundle(_address.hex)],
+      pagingInfo: xmtp.PagingInfo(limit: 10),
+    ));
+    return stored.envelopes
+        .map((e) => xmtp.EncryptedPrivateKeyBundle.fromBuffer(e.message))
+        .toList();
+  }
+
+  Future<xmtp.PublishResponse> _savePrivateKeys(
+    xmtp.EncryptedPrivateKeyBundle encrypted,
+  ) async {
+    return _api.client.publish(xmtp.PublishRequest(envelopes: [
+      xmtp.Envelope(
+        contentTopic: Topic.userPrivateStoreKeyBundle(_address.hex),
+        timestampNs: nowNs(),
+        message: encrypted.writeToBuffer(),
+      ),
+    ]));
+  }
+}
 
 /// This adds some helper methods to [Credentials] (i.e. a signer)
 /// to allow it to create and enable XMTP identities.
@@ -102,7 +194,7 @@ extension AuthCredentials on Credentials {
 extension ToUnsignedPublicKey on EthPrivateKey {
   xmtp.PublicKey toUnsignedPublicKey() {
     return xmtp.PublicKey(
-      timestamp: _nowMs(),
+      timestamp: nowMs(),
       secp256k1Uncompressed: xmtp.PublicKey_Secp256k1Uncompressed(
         // NOTE: The 0x04 prefix indicates that it is uncompressed.
         bytes: [0x04] + encodedPublicKey,
@@ -168,7 +260,7 @@ extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
         return preKey;
       }
     }
-    throw "unable to find preKey ${address.hexEip55}";
+    throw StateError("unable to find preKey ${address.hexEip55}");
   }
 
   /// Create the v1 bundle for these keys.
@@ -176,10 +268,11 @@ extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
     if (whichVersion() == xmtp.PrivateKeyBundle_Version.v1) {
       return v1;
     }
-    var unsignedPublic = xmtp.UnsignedPublicKey.fromBuffer(v2.identityKey.publicKey.keyBytes);
+    var unsignedPublic =
+        xmtp.UnsignedPublicKey.fromBuffer(v2.identityKey.publicKey.keyBytes);
     return xmtp.PrivateKeyBundleV1(
         identityKey: xmtp.PrivateKey(
-            timestamp: v2.identityKey.createdNs ~/ 1000000,
+            timestamp: v2.identityKey.createdNs.toMs(),
             secp256k1: xmtp.PrivateKey_Secp256k1(
               bytes: v2.identityKey.secp256k1.bytes,
             ),
@@ -199,7 +292,7 @@ extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
     }
     return xmtp.PrivateKeyBundleV2(
         identityKey: xmtp.SignedPrivateKey(
-      createdNs: v1.identityKey.timestamp * 1000000,
+      createdNs: v1.identityKey.timestamp.toNs(),
       secp256k1: xmtp.SignedPrivateKey_Secp256k1(
         bytes: v1.identityKey.secp256k1.bytes,
       ),
@@ -231,14 +324,14 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
   /// TODO: consider supporting V2 key bundles
   Future<String> createAuthToken() async {
     if (whichVersion() != xmtp.PrivateKeyBundle_Version.v1) {
-      throw "only supported on xmtp.PrivateKeyBundle v1";
+      throw UnsupportedError("only supported on xmtp.PrivateKeyBundle v1");
     }
 
     var walletAddr = v1.identityKey.publicKey
         .recoverWalletSignerPublicKey()
         .toEthereumAddress()
         .hexEip55;
-    var authData = xmtp.AuthData(walletAddr: walletAddr, createdNs: _nowNs());
+    var authData = xmtp.AuthData(walletAddr: walletAddr, createdNs: nowNs());
     var authDataBytes = authData.writeToBuffer();
 
     var identityPrivateKey =
@@ -257,5 +350,5 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
   }
 }
 
-Int64 _nowNs() => Int64(DateTime.now().millisecondsSinceEpoch) * 1000000;
-Int64 _nowMs() => Int64(DateTime.now().millisecondsSinceEpoch);
+final _rand = Random.secure();
+EthPrivateKey generateKeyPair() => EthPrivateKey.createRandom(_rand);

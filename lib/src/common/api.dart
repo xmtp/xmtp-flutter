@@ -139,7 +139,8 @@ class _DebugLogInterceptor extends grpc.ClientInterceptor {
     debugPrint('xmtp: #$reqN <-> ${method.path}');
     if (isDebugLoggingTopics) {
       requests.single.then((req) {
-        debugPrint(' topic: ${(req as xmtp.SubscribeRequest).contentTopics.first}');
+        debugPrint(
+            ' topic: ${(req as xmtp.SubscribeRequest).contentTopics.first}');
       });
     }
     return invoker(method, requests, options);
