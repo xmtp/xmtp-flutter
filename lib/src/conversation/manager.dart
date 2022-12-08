@@ -2,6 +2,7 @@ import 'package:async/async.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import '../contact.dart';
+import '../content/decoded.dart';
 import 'conversation.dart';
 import 'conversation_v1.dart';
 import 'conversation_v2.dart';
@@ -25,21 +26,25 @@ class ConversationManager {
   /// This creates or resumes a conversation with [address].
   /// This throws if [address] is not on the XMTP network.
   Future<Conversation> newConversation(
-    String address, {
-    xmtp.InvitationV1_Context? context,
-  }) async {
-    context ??= xmtp.InvitationV1_Context();
+    String address,
+    String conversationId,
+    Map<String, String> metadata,
+  ) async {
     var peerContacts = await _contacts.getUserContacts(address);
     if (peerContacts.isEmpty) {
       throw StateError("recipient $address is not on the XMTP network");
     }
     // We only check for an ongoing V1 when it includes no `conversationId`.
-    if (!context.hasConversationId()) {
+    if (conversationId.isEmpty) {
       var ongoing = await _v1.findConversation(address);
       if (ongoing != null) {
         return ongoing;
       }
     }
+    var context = xmtp.InvitationV1_Context(
+      conversationId: conversationId,
+      metadata: metadata,
+    );
     var ongoing = await _v2.findConversation(address, context);
     if (ongoing != null) {
       return ongoing;
@@ -62,4 +67,30 @@ class ConversationManager {
       _v2.streamConversations(),
     ]);
   }
+
+  /// This lists the messages in [conversation].
+  Future<List<DecodedMessage>> listMessages(
+    Conversation conversation,
+  ) =>
+      conversation.version == xmtp.Message_Version.v1
+          ? _v1.listMessages(conversation)
+          : _v2.listMessages(conversation);
+
+  /// This exposes a stream of new messages in [conversation].
+  Stream<DecodedMessage> streamMessages(
+    Conversation conversation,
+  ) =>
+      conversation.version == xmtp.Message_Version.v1
+          ? _v1.streamMessages(conversation)
+          : _v2.streamMessages(conversation);
+
+  /// This sends [content] as a message to [conversation].
+  Future<DecodedMessage> sendMessage(
+    Conversation conversation,
+    Object content, {
+    xmtp.ContentTypeId? contentType,
+  }) =>
+      conversation.version == xmtp.Message_Version.v1
+          ? _v1.sendMessage(conversation, content, contentType: contentType)
+          : _v2.sendMessage(conversation, content, contentType: contentType);
 }

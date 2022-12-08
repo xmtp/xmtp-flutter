@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/auth.dart';
@@ -25,6 +26,16 @@ void main() {
     var token = xmtp.Token.fromBuffer(base64.decode(authToken));
     var authData = xmtp.AuthData.fromBuffer(token.authDataBytes);
     expect(authData.walletAddr, alice.address.hexEip55);
+    expect(
+      token.identityKey.recoverWalletSignerPublicKey().toEthereumAddress(),
+      alice.address,
+    );
+    // Note: there's a difference here between the contact and auth token.
+    //       The go backend expects auth tokens signed with `ecdsaCompact`.
+    //       The js-lib expects contacts signed with `walletEcdsaCompact`.
+    // TODO: teach both ^ to accept either.
+    // For now, this is what the backend expects inside the authToken.
+    expect(token.identityKey.signature.hasEcdsaCompact(), true);
   });
 
   test('enabling saving and loading of stored keys', () async {
@@ -44,6 +55,10 @@ void main() {
     expect(decrypted.wallet.hexEip55, alice.address.hexEip55);
     expect(decrypted.identity.address.hexEip55, identity.address.hexEip55);
     expect(decrypted.preKeys.length, 1);
+    var preKey = decrypted.v1.preKeys.first.publicKey;
+    var preSigner = await preKey.recoverIdentitySignerPublicKey();
+    // Make sure the pre key was signed by the identity key.
+    expect(preSigner.toEthereumAddress(), identity.address);
   });
 
   // This creates and authorizes an identity key.
@@ -87,14 +102,27 @@ void main() {
       var alice = EthPrivateKey.fromHex("... private key ...");
       var auth = AuthManager(alice.address, api);
       var decrypted = await auth.authenticateWithCredentials(alice);
+      debugPrint("decrypted $decrypted");
       var wallet = decrypted.wallet.hexEip55;
       var identity = decrypted.identity.address.hexEip55;
+      var identitySigner = decrypted.v1.identityKey.publicKey
+          .recoverWalletSignerPublicKey()
+          .toEthereumAddress()
+          .hexEip55;
       var pre = decrypted.preKeys.isNotEmpty
           ? decrypted.preKeys.first.address.hexEip55
           : "(none)";
+      var preSigner = (await decrypted.v1.preKeys.first.publicKey
+              .recoverIdentitySignerPublicKey())
+          .toEthereumAddress()
+          .hexEip55;
       debugPrint("wallet $wallet");
       debugPrint(" -> identity $identity");
+      debugPrint("          by $identitySigner");
       debugPrint("  -> pre $pre");
+      debugPrint("      by $preSigner");
+      expect(identitySigner, wallet);
+      expect(preSigner, identity);
     },
   );
 }

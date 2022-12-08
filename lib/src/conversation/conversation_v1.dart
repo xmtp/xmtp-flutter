@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:web3dart/credentials.dart';
 import 'package:web3dart/crypto.dart';
@@ -26,6 +27,10 @@ class ConversationManagerV1 {
   final CodecRegistry _codecs;
   final ContactManager _contacts;
 
+  // This is a session-cache of known conversations.
+  // We use this to decide whether a message requires us to fire off intros.
+  final Set<String> _seenTopics = {};
+
   ConversationManagerV1(
     this._me,
     this._api,
@@ -34,22 +39,14 @@ class ConversationManagerV1 {
     this._contacts,
   );
 
+  Future<Conversation> fromBlob(Uint8List blob) async {
+    return _conversationFromIntro(xmtp.Message.fromBuffer(blob));
+  }
+
   Future<Conversation> newConversation(String address) async {
     var peer = EthereumAddress.fromHex(address);
-    var peerContact = await _contacts.getUserContactV1(peer.hex);
-    var topic = Topic.directMessageV1(_me.hex, peer.hex);
     var createdAt = DateTime.now();
-    return ConversationV1(
-      _api,
-      _auth,
-      peerContact,
-      _codecs,
-      topic,
-      createdAt,
-      me: _me,
-      peer: peer,
-      isIntroductionRequired: true,
-    );
+    return Conversation.v1(createdAt, me: _me, peer: peer);
   }
 
   /// This returns the latest [Conversation] with [address].
@@ -84,7 +81,7 @@ class ConversationManagerV1 {
       .map((e) => xmtp.Message.fromBuffer(e.message))
       .asyncMap((msg) => _conversationFromIntro(msg));
 
-  Future<ConversationV1> _conversationFromIntro(xmtp.Message msg) async {
+  Future<Conversation> _conversationFromIntro(xmtp.Message msg) async {
     var header = xmtp.MessageHeaderV1.fromBuffer(msg.v1.headerBytes);
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
     var decoded = await _codecs.decodeContent(encoded);
@@ -92,6 +89,7 @@ class ConversationManagerV1 {
       msg,
       decoded.contentType,
       decoded.content,
+      encoded,
     );
     var createdAt = intro.sentAt;
     var sender = intro.sender;
@@ -99,62 +97,16 @@ class ConversationManagerV1 {
         .recoverWalletSignerPublicKey()
         .toEthereumAddress();
     var peer = {sender, recipient}.firstWhere((a) => a != _me);
-    var peerContact = await _contacts.getUserContactV1(peer.hex);
     var topic = Topic.directMessageV1(_me.hex, peer.hex);
-    return ConversationV1(
-      _api,
-      _auth,
-      peerContact,
-      _codecs,
-      topic,
-      createdAt,
-      me: _me,
-      peer: peer,
-      isIntroductionRequired: false,
-    );
+    _seenTopics.add(topic);
+    return Conversation.v1(createdAt, me: _me, peer: peer);
   }
-}
 
-/// There is no additional [ConversationContext] in V1 conversations.
-final ConversationContext _emptyContext = ConversationContext("", {});
-
-class ConversationV1 extends Conversation {
-  @override
-  final xmtp.Message_Version version = xmtp.Message_Version.v1;
-  @override
-  final ConversationContext context = _emptyContext;
-  @override
-  final EthereumAddress me;
-  @override
-  final EthereumAddress peer;
-  @override
-  final String topic;
-  @override
-  final DateTime createdAt;
-
-  final Api _api;
-  final AuthManager _auth;
-  final xmtp.ContactBundle _peerContact;
-  final CodecRegistry _codecs;
-  bool isIntroductionRequired; // we clear this after sending.
-
-  ConversationV1(
-    this._api,
-    this._auth,
-    this._peerContact,
-    this._codecs,
-    this.topic,
-    this.createdAt, {
-    // This uses named address params to avoid confusion.
-    required this.me,
-    required this.peer,
-    required this.isIntroductionRequired,
-  });
-
-  @override
-  Future<List<DecodedMessage>> listMessages() async {
+  Future<List<DecodedMessage>> listMessages(
+    Conversation conversation,
+  ) async {
     var listing = await _api.client.query(xmtp.QueryRequest(
-      contentTopics: [topic],
+      contentTopics: [conversation.topic],
       // TODO: support listing params per js-lib
     ));
     return Future.wait(listing.envelopes
@@ -162,54 +114,63 @@ class ConversationV1 extends Conversation {
         .map((msg) => _decodedFromMessage(msg)));
   }
 
-  @override
-  Stream<DecodedMessage> streamMessages() => _api.client
-      .subscribe(xmtp.SubscribeRequest(
-        contentTopics: [topic],
-      ))
-      .map((e) => xmtp.Message.fromBuffer(e.message))
-      .asyncMap((msg) => _decodedFromMessage(msg));
+  Stream<DecodedMessage> streamMessages(Conversation conversation) =>
+      _api.client
+          .subscribe(xmtp.SubscribeRequest(
+            contentTopics: [conversation.topic],
+          ))
+          .map((e) => xmtp.Message.fromBuffer(e.message))
+          .asyncMap((msg) => _decodedFromMessage(msg));
 
   /// This decrypts and decodes the [xmtp.Message].
   Future<DecodedMessage> _decodedFromMessage(xmtp.Message msg) async {
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
     var decoded = await _codecs.decodeContent(encoded);
-    return _createDecodedMessage(msg, decoded.contentType, decoded.content);
+    return _createDecodedMessage(
+      msg,
+      decoded.contentType,
+      decoded.content,
+      encoded,
+    );
   }
 
-  @override
-  Future<DecodedMessage> send(
+  Future<DecodedMessage> sendMessage(
+    Conversation conversation,
     Object content, {
     xmtp.ContentTypeId? contentType,
   }) async {
     contentType ??= contentTypeText;
     var encoded = await _codecs.encodeContent(contentType, content);
+    var peerContact = await _contacts.getUserContactV1(conversation.peer.hex);
     var encrypted = await encryptMessageV1(
       _auth.keys,
-      _peerContact.v1.keyBundle,
+      peerContact.v1.keyBundle,
       encoded,
     );
     var msg = xmtp.Message(v1: encrypted);
-    if (isIntroductionRequired) {
-      isIntroductionRequired = false;
-      await _sendIntros(encrypted);
+    if (!_seenTopics.contains(conversation.topic)) {
+      _seenTopics.add(conversation.topic);
+      await _sendIntros(conversation, encrypted);
     }
     await _api.client.publish(xmtp.PublishRequest(envelopes: [
       xmtp.Envelope(
-        contentTopic: topic,
+        contentTopic: conversation.topic,
         timestampNs: nowNs(),
         message: msg.writeToBuffer(),
       ),
     ]));
 
     // This returns a decoded edition for optimistic local updates.
-    return _createDecodedMessage(msg, contentType, content);
+    return _createDecodedMessage(msg, contentType, content, encoded);
   }
 
-  Future<xmtp.PublishResponse> _sendIntros(xmtp.MessageV1 msg) async {
+  Future<xmtp.PublishResponse> _sendIntros(
+    Conversation conversation,
+    xmtp.MessageV1 msg,
+  ) async {
     var addresses = [
-      me.hex,
-      peer.hex,
+      conversation.me.hex,
+      conversation.peer.hex,
     ];
     var timestampNs = nowNs();
     var message = xmtp.Message(v1: msg).writeToBuffer();
@@ -293,19 +254,21 @@ Future<DecodedMessage> _createDecodedMessage(
   xmtp.Message dm,
   xmtp.ContentTypeId contentType,
   Object content,
+  xmtp.EncodedContent encoded,
 ) async {
   var id = bytesToHex(await sha256(dm.writeToBuffer()));
   var header = xmtp.MessageHeaderV1.fromBuffer(dm.v1.headerBytes);
-  var sender = header.sender.identityKey
-      .recoverWalletSignerPublicKey()
-      .toEthereumAddress();
+  var sender = header.sender.wallet;
   var sentAt = header.timestamp.toDateTime();
+  var topic = Topic.directMessageV1(sender.hex, header.recipient.wallet.hex);
   return DecodedMessage(
     xmtp.Message_Version.v1,
-    id,
     sentAt,
     sender,
+    encoded,
     contentType,
     content,
+    id: id,
+    topic: topic,
   );
 }

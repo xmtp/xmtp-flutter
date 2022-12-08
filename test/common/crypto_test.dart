@@ -46,6 +46,36 @@ void main() {
     expect(aliceSecret, bobSecret);
   });
 
+  test('creating EC keys', () async {
+    for (var i = 0; i < 10; ++i) {
+      var pair = EthPrivateKey.createRandom(Random.secure());
+      createECPrivateKey(pair.privateKey);
+      createECPublicKey(pair.encodedPublicKey);
+    }
+  });
+
+  test('prepending 0x04 to encoded public keys', () async {
+    // These reproduce a fixed bug.
+    //
+    // When the 64 bytes of a public key had a leading byte of 0x04 we were
+    // failing to prepend the additional 65th byte of 0x04. This caused the
+    // point decoder to reject the malformed key.
+    //
+    // So these (randomly generated) pairs have public key encodings that
+    // all have a 0x04 first byte. This reproduces the issue that was fixed.
+    var producesLeading04 = [
+      "94b0d16bdd3ff8b8725a3ba90b8a5009cfa3779b5c1bf97c5bad7b5694e929ba",
+      "5ed96997701a0ff7f21f598e76953b089f9e0059c0743b3b56de4149a3a96906",
+      "f6fc4a83e63ac82ca5bf8c794dd92fa2e54f49a77afe6d648beeab3c941bc9c1",
+    ];
+    for (var k in producesLeading04) {
+      var pair = EthPrivateKey.fromHex(k);
+      expect(pair.encodedPublicKey[0], 0x04);
+      // This would fail before the fix.
+      createECPublicKey(pair.encodedPublicKey);
+    }
+  });
+
   test('symmetric 3dh', () async {
     var aliceId = EthPrivateKey.createRandom(Random.secure());
     var alicePre = EthPrivateKey.createRandom(Random.secure());

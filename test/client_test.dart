@@ -14,7 +14,7 @@ void main() {
   // sends messages back and forth between them.
   test(
     skip: skipUnlessTestServerEnabled,
-    "v1 messaging: intros, reading, writing, streaming",
+    "messaging: listing, reading, writing, streaming",
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure());
       var aliceApi = createTestServerApi();
@@ -33,35 +33,35 @@ void main() {
       var aliceConvo = await alice.newConversation(bobAddress);
       var bobConvo = await bob.newConversation(aliceAddress);
 
-      var aliceMessages = await aliceConvo.listMessages();
-      var bobMessages = await bobConvo.listMessages();
+      var aliceMessages = await alice.listMessages(aliceConvo);
+      var bobMessages = await alice.listMessages(bobConvo);
 
       expect(aliceMessages.length, 0);
       expect(bobMessages.length, 0);
 
       // Bob starts listening to the stream and recording the transcript.
       var transcript = [];
-      var bobListening = bobConvo
-          .streamMessages()
+      var bobListening = bob
+          .streamMessages(bobConvo)
           .listen((msg) => transcript.add('${msg.sender.hex}> ${msg.content}'));
 
       // Alice sends the first message.
-      await aliceConvo.send("hello Bob, it's me Alice!");
+      await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
 
       // It gets added to both of their conversation lists with that first msg.
       expect((await alice.listConversations()).length, 1);
       expect((await bob.listConversations()).length, 1);
 
       // And Bob see the message in the conversation.
-      bobMessages = await bobConvo.listMessages();
+      bobMessages = await bob.listMessages(bobConvo);
       expect(bobMessages.length, 1);
       expect(bobMessages[0].sender, aliceWallet.address);
       expect(bobMessages[0].content, "hello Bob, it's me Alice!");
 
       // Bob replies
-      await bobConvo.send("oh, hello Alice!");
+      await bob.sendMessage(bobConvo, "oh, hello Alice!");
 
-      aliceMessages = await aliceConvo.listMessages();
+      aliceMessages = await alice.listMessages(aliceConvo);
       expect(aliceMessages.length, 2);
       expect(aliceMessages[0].sender, bobWallet.address);
       expect(aliceMessages[0].content, "oh, hello Alice!");
@@ -72,6 +72,47 @@ void main() {
       expect(transcript, [
         "$aliceAddress> hello Bob, it's me Alice!",
         "$bobAddress> oh, hello Alice!",
+      ]);
+    },
+  );
+
+  // This conducts two distinct conversations between the same two users.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "messaging: distinguish conversations using conversationId",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+
+      var work = await alice.newConversation(
+        bob.address.hex,
+        conversationId: "https://example.com/alice-bob-discussing-work",
+      );
+      await alice.sendMessage(work, "Bob, let's chat here about work.");
+      await alice.sendMessage(work, "Our quarterly report is due next week.");
+
+      var play = await alice.newConversation(
+        bob.address.hex,
+        conversationId: "https://example.com/alice-bob-discussing-play",
+      );
+      await alice.sendMessage(play, "Bob, let's chat here about play.");
+      await alice.sendMessage(play, "I don't want to work.");
+      await alice.sendMessage(play, "I just want to bang on my drum all day.");
+
+      var bobChats = await bob.listConversations();
+      expect(bobChats.length, 2);
+      expect((await bob.listMessages(work)).map((m) => m.content).toList(), [
+        "Our quarterly report is due next week.",
+        "Bob, let's chat here about work.",
+      ]);
+      expect((await bob.listMessages(play)).map((m) => m.content).toList(), [
+        "I just want to bang on my drum all day.",
+        "I don't want to work.",
+        "Bob, let's chat here about play.",
       ]);
     },
   );
@@ -91,7 +132,7 @@ void main() {
       for (var convo in conversations) {
         debugPrint('Conversation with ${convo.peer} ${convo.version}');
         debugPrint(' -> ${convo.topic}');
-        var messages = await convo.listMessages();
+        var messages = await client.listMessages(convo);
         for (var msg in messages) {
           debugPrint(' ${msg.sentAt} ${msg.sender}> ${msg.content}');
         }

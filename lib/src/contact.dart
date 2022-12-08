@@ -78,6 +78,19 @@ class ContactManager {
       ),
     ));
   }
+
+  /// This ensures that the [keys] public contact is published to the server.
+  Future<bool> ensureSavedContact(
+    xmtp.PrivateKeyBundle keys,
+  ) async {
+    var address = keys.wallet.hex;
+    var myContacts = await getUserContacts(address);
+    if (myContacts.isNotEmpty) {
+      return false;
+    }
+    await saveContact(keys);
+    return true;
+  }
 }
 
 /// This adds a helper to [xmtp.Envelope] to help when

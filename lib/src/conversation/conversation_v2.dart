@@ -62,21 +62,18 @@ class ConversationManagerV2 {
     xmtp.InvitationV1_Context context,
   ) async {
     var peer = EthereumAddress.fromHex(address);
-    var conversations = await _listConversations();
+    var conversations = await listConversations();
     try {
-      return conversations.firstWhere(
-          (c) => c.peer == peer && c.hasConversationId(context.conversationId));
+      return conversations.firstWhere((c) =>
+          c.peer == peer &&
+          c.invite.context.conversationId == context.conversationId);
     } catch (notFound) {
       return null;
     }
   }
 
   /// This returns the list of all invited [Conversation]s.
-  Future<List<Conversation>> listConversations() => _listConversations();
-
-  /// This returns the list of all invited conversations.
-  /// Note: this is private to avoid leaking the [_ConversationV2] type.
-  Future<List<_ConversationV2>> _listConversations() async {
+  Future<List<Conversation>> listConversations() async {
     var listing = await _api.client.query(xmtp.QueryRequest(
       contentTopics: [Topic.userInvite(_me.hex)],
       // TODO: support listing params per js-lib
@@ -97,8 +94,8 @@ class ConversationManagerV2 {
       .map((e) => xmtp.SealedInvitation.fromBuffer(e.message))
       .asyncMap((sealed) => _conversationFromInvite(sealed));
 
-  /// This helper adapts a [sealed] invitation into a [_ConversationV2].
-  Future<_ConversationV2> _conversationFromInvite(
+  /// This helper adapts a [sealed] invitation into a [Conversation].
+  Future<Conversation> _conversationFromInvite(
     xmtp.SealedInvitation sealed,
   ) async {
     var headerBytes = sealed.v1.headerBytes;
@@ -108,14 +105,78 @@ class ConversationManagerV2 {
     var sender = header.sender.wallet;
     var recipient = header.recipient.wallet;
     var peer = {sender, recipient}.firstWhere((a) => a != _me);
-    return _ConversationV2(
-      _api,
-      _auth,
-      _codecs,
+    return Conversation.v2(
       invite,
       createdAt,
       me: _me,
       peer: peer,
+    );
+  }
+
+  /// This sends the [content] as a message to the [conversation].
+  Future<DecodedMessage> sendMessage(
+    Conversation conversation,
+    Object content, {
+    xmtp.ContentTypeId? contentType,
+  }) async {
+    contentType ??= contentTypeText;
+    var encoded = await _codecs.encodeContent(contentType, content);
+    var header = xmtp.MessageHeaderV2(
+      topic: conversation.topic,
+      createdNs: nowNs(),
+    );
+    var signed = await _signContent(_auth.keys, header, encoded);
+    var encrypted = await _encryptMessageV2(
+        _auth.keys, conversation.invite, header, signed);
+    var dm = xmtp.Message(v2: encrypted);
+    await _api.client.publish(xmtp.PublishRequest(envelopes: [
+      xmtp.Envelope(
+        contentTopic: conversation.topic,
+        timestampNs: nowNs(),
+        message: dm.writeToBuffer(),
+      ),
+    ]));
+    return _createDecodedMessage(dm, signed, contentType, content, encoded);
+  }
+
+  /// This lists the current messages in the [conversation]
+  Future<List<DecodedMessage>> listMessages(
+    Conversation conversation,
+  ) async {
+    var listing = await _api.client.query(xmtp.QueryRequest(
+      contentTopics: [conversation.topic],
+      // TODO: support listing params per js-lib
+    ));
+    return Future.wait(listing.envelopes
+        .map((e) => xmtp.Message.fromBuffer(e.message))
+        .map((msg) => _decodedFromMessage(conversation, msg)));
+  }
+
+  /// This exposes the stream of new messages in the [conversation].
+  Stream<DecodedMessage> streamMessages(
+    Conversation conversation,
+  ) =>
+      _api.client
+          .subscribe(xmtp.SubscribeRequest(
+            contentTopics: [conversation.topic],
+          ))
+          .map((e) => xmtp.Message.fromBuffer(e.message))
+          .asyncMap((msg) => _decodedFromMessage(conversation, msg));
+
+  /// This decrypts and decodes the [xmtp.Message].
+  Future<DecodedMessage> _decodedFromMessage(
+    Conversation conversation,
+    xmtp.Message msg,
+  ) async {
+    var signed = await _decryptMessageV2(msg.v2, conversation.invite);
+    var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
+    var decoded = await _codecs.decodeContent(encoded);
+    return _createDecodedMessage(
+      msg,
+      signed,
+      decoded.contentType,
+      decoded.content,
+      encoded,
     );
   }
 
@@ -135,111 +196,15 @@ class ConversationManagerV2 {
       ));
 }
 
-/// This encapsulates a V2 conversation in the uniform shape of a [Conversation].
-class _ConversationV2 extends Conversation {
-  @override
-  final xmtp.Message_Version version = xmtp.Message_Version.v2;
-  @override
-  final EthereumAddress me;
-  @override
-  final EthereumAddress peer;
-  @override
-  final DateTime createdAt;
-
-  @override
-  String get topic => _invite.topic;
-
-  @override
-  ConversationContext get context => ConversationContext(
-        _invite.context.conversationId,
-        _invite.context.metadata,
-      );
-
-  final Api _api;
-  final AuthManager _auth;
-  final CodecRegistry _codecs;
-  final xmtp.InvitationV1 _invite;
-
-  _ConversationV2(
-    this._api,
-    this._auth,
-    this._codecs,
-    this._invite,
-    this.createdAt, {
-    required this.me,
-    required this.peer,
-  });
-
-  @override
-  Future<DecodedMessage> send(
-    Object content, {
-    xmtp.ContentTypeId? contentType,
-  }) async {
-    contentType ??= contentTypeText;
-    var encoded = await _codecs.encodeContent(contentType, content);
-    var header = xmtp.MessageHeaderV2(
-      topic: topic,
-      createdNs: nowNs(),
-    );
-    var signed = await _signContent(_auth.keys, header, encoded);
-    var encrypted =
-        await _encryptMessageV2(_auth.keys, _invite, header, signed);
-    var dm = xmtp.Message(v2: encrypted);
-    await _api.client.publish(xmtp.PublishRequest(envelopes: [
-      xmtp.Envelope(
-        contentTopic: topic,
-        timestampNs: nowNs(),
-        message: dm.writeToBuffer(),
-      ),
-    ]));
-    return _createDecodedMessage(dm, signed, contentType, content);
-  }
-
-  @override
-  Future<List<DecodedMessage>> listMessages() async {
-    var listing = await _api.client.query(xmtp.QueryRequest(
-      contentTopics: [topic],
-      // TODO: support listing params per js-lib
-    ));
-    return Future.wait(listing.envelopes
-        .map((e) => xmtp.Message.fromBuffer(e.message))
-        .map((msg) => _decodedFromMessage(msg)));
-  }
-
-  @override
-  Stream<DecodedMessage> streamMessages() => _api.client
-      .subscribe(xmtp.SubscribeRequest(
-        contentTopics: [topic],
-      ))
-      .map((e) => xmtp.Message.fromBuffer(e.message))
-      .asyncMap((msg) => _decodedFromMessage(msg));
-
-  /// This helps match the conversation by Id.
-  bool hasConversationId(String conversationId) =>
-      _invite.context.conversationId == conversationId;
-
-  /// This decrypts and decodes the [xmtp.Message].
-  Future<DecodedMessage> _decodedFromMessage(xmtp.Message msg) async {
-    var signed = await _decryptMessageV2(msg.v2, _invite);
-    var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
-    var decoded = await _codecs.decodeContent(encoded);
-    return _createDecodedMessage(
-      msg,
-      signed,
-      decoded.contentType,
-      decoded.content,
-    );
-  }
-}
-
 /// This uses the provided `context` to create a new conversation invitation.
 /// It randomly generates the topic identifier and encryption key material.
 xmtp.InvitationV1 _createInviteV1(xmtp.InvitationV1_Context context) {
   // The topic is a random string of alphanumerics.
   // This base64 encodes some random bytes and strips non-alphanumerics.
   // Note: we don't rely on this being valid base64 anywhere.
-  var topic = base64.encode(generateRandomBytes(32));
-  topic = topic.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+  var randomId = base64.encode(generateRandomBytes(32));
+  randomId = randomId.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+  var topic = Topic.messageV2(randomId);
 
   var keyMaterial = generateRandomBytes(32);
   return xmtp.InvitationV1(
@@ -358,7 +323,7 @@ Future<xmtp.SignedContent> _signContent(
   var payload = content.writeToBuffer();
   var digest = await sha256(headerBytes + payload);
   var preKey = keys.preKeys.first;
-  var signature = await preKey.signToSignature(Uint8List.fromList(digest));
+  var signature = sign(Uint8List.fromList(digest), preKey.privateKey);
   return xmtp.SignedContent(
     payload: payload,
     sender: createContactBundleV2(keys).v2.keyBundle,
@@ -374,19 +339,20 @@ Future<DecodedMessage> _createDecodedMessage(
   xmtp.SignedContent signed,
   xmtp.ContentTypeId contentType,
   Object content,
+  xmtp.EncodedContent encoded,
 ) async {
   var id = bytesToHex(await sha256(dm.writeToBuffer()));
   var header = xmtp.MessageHeaderV2.fromBuffer(dm.v2.headerBytes);
-  var sender = signed.sender.identityKey
-      .recoverWalletSignerPublicKey()
-      .toEthereumAddress();
+  var sender = signed.sender.wallet;
   var sentAt = header.createdNs.toDateTime();
   return DecodedMessage(
     xmtp.Message_Version.v2,
-    id,
     sentAt,
     sender,
+    encoded,
     contentType,
     content,
+    id: id,
+    topic: header.topic,
   );
 }
