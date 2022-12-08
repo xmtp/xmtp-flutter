@@ -141,7 +141,7 @@ void main() {
   );
 
   test(
-    skip: !testServerEnabled,
+    skip: skipUnlessTestServerEnabled,
     "contact creation / loading",
     () async {
       // Setup the API client.

@@ -13,7 +13,7 @@ void main() {
   // This creates 2 new users with connected clients and
   // sends messages back and forth between them.
   test(
-    skip: !testServerEnabled,
+    skip: skipUnlessTestServerEnabled,
     "v1 messaging: intros, reading, writing, streaming",
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure());

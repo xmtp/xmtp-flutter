@@ -13,5 +13,8 @@ jobs:
         with:
           flutter-version: '3.3.7'
           channel: 'stable'
+      - run: docker-compose -p xmtp -f "tool/local-node/docker-compose.yml" up -d
       - run: flutter pub get
-      - run: flutter test
+      - run: flutter test --dart-define=TEST_SERVER_ENABLED=true
+      - run: docker-compose -p xmtp -f "tool/local-node/docker-compose.yml" down
+        if: always()

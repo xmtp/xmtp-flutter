@@ -50,7 +50,7 @@ void main() {
   // It saves (encrypts) that key to the network storage
   // and then loads (decrypts) it back.
   test(
-    skip: !testServerEnabled,
+    skip: skipUnlessTestServerEnabled,
     "storing private keys",
     () async {
       var alice = EthPrivateKey.createRandom(Random.secure());

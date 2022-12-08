@@ -17,7 +17,7 @@ void main() {
   // This creates 2 users connected to the API and sends DMs
   // back and forth using message API V1.
   test(
-    skip: !testServerEnabled,
+    skip: skipUnlessTestServerEnabled,
     "v1 messaging: intros, reading, writing, streaming",
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure());
