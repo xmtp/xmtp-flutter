@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/credentials.dart';
+import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/auth.dart';
@@ -170,6 +171,17 @@ void main() {
       expect(storedV1.whichVersion(), xmtp.ContactBundle_Version.v1);
       expect(storedV2.wallet, alice.address);
       expect(storedV2.whichVersion(), xmtp.ContactBundle_Version.v2);
+      // Note: there's a difference here between the contact and auth token.
+      //       The go backend expects auth tokens signed with `ecdsaCompact`.
+      //       The js-lib expects contacts signed with `walletEcdsaCompact`.
+      // TODO: teach both ^ to accept either.
+      // For now this is what the js-lib expects inside the contact.
+      expect(
+        storedV1.v1.keyBundle.identityKey
+            .recoverWalletSignerPublicKey()
+            .toEthereumAddress(),
+        alice.address,
+      );
     },
   );
 }

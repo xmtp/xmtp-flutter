@@ -1,61 +1,64 @@
 import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
-import '../content/decoded.dart';
+import '../common/topic.dart';
 
 /// This represents an ongoing conversation.
-/// It exposes methods to [listMessages] and [send] them.
-///
-/// And it exposes a [streamMessages] that emits new messages as they arrive.
+/// It can be provided to [Client] to [listMessages] and [sendMessage].
+/// The [Client] also allows you to [streamMessages] from this [Conversation].
 ///
 /// It attempts to give uniform shape to v1 and v2 conversations.
-abstract class Conversation {
+class Conversation {
   /// This indicates whether this a v1 or v2 conversation.
-  xmtp.Message_Version get version;
-
-  /// This contains any additional conversation context.
-  /// NOTE: this will be empty for V1 conversations.
-  ConversationContext get context;
-
-  /// This is the address for me, the configured client user.
-  EthereumAddress get me;
-
-  /// This is the address of the peer that I am talking to.
-  EthereumAddress get peer;
-
-  /// When the conversation was first created.
-  DateTime get createdAt;
+  final xmtp.Message_Version version;
 
   /// This is the underlying unique topic name for this conversation.
   /// NOTE: this is a good identifier for local caching purposes.
-  String get topic;
+  final String topic;
 
-  /// This lists messages sent to this conversation.
-  // TODO: support listing params per js-lib
-  Future<List<DecodedMessage>> listMessages();
+  /// This distinctly identifies between two addresses.
+  /// Note: this will be empty for older v1 conversations.
+  final String conversationId;
 
-  /// This exposes a streams of new messages sent to this conversation.
-  Stream<DecodedMessage> streamMessages();
+  /// This contains any additional conversation context.
+  /// Note: this will be empty for older v1 conversations.
+  final Map<String, String> metadata;
 
-  /// This sends a new message to this conversation.
-  /// It returns the [DecodedMessage] to simplify optimistic local updates.
-  ///  e.g. you can display the [DecodedMessage] immediately
-  ///       without having to wait for it to come back down the stream.
-  Future<DecodedMessage> send(
-    Object content, {
-    xmtp.ContentTypeId? contentType,
-  });
+  /// This contains the invitation to this conversation.
+  /// Note: this will be empty for older v1 conversations.
+  final xmtp.InvitationV1 invite;
+
+  /// This is the address for me, the configured client user.
+  final EthereumAddress me;
+
+  /// This is the address of the peer that I am talking to.
+  final EthereumAddress peer;
+
+  /// When the conversation was first created.
+  final DateTime createdAt;
+
+  Conversation.v1(
+    this.createdAt, {
+    required this.me,
+    required this.peer,
+  })  : version = xmtp.Message_Version.v1,
+        topic = Topic.directMessageV1(me.hex, peer.hex),
+        conversationId = "",
+        metadata = <String, String>{},
+        invite = xmtp.InvitationV1();
+
+  Conversation.v2(
+    this.invite,
+    this.createdAt, {
+    required this.me,
+    required this.peer,
+  })  : version = xmtp.Message_Version.v2,
+        topic = invite.topic,
+        conversationId = invite.context.conversationId,
+        metadata = invite.context.metadata;
 
   @override
   String toString() {
     return 'Conversation{version:$version me:$me peer:$peer topic:$topic}';
   }
-}
-
-/// This contains any additional conversation context from the invitation.
-class ConversationContext {
-  final String conversationId;
-  final Map<String, String> metadata;
-
-  ConversationContext(this.conversationId, this.metadata);
 }

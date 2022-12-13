@@ -53,23 +53,23 @@ void main() {
 
       // Bob starts listening to the stream and recording the transcript.
       var transcript = [];
-      var bobListening = bobConvo
-          .streamMessages()
+      var bobListening = bob
+          .streamMessages(bobConvo)
           .listen((msg) => transcript.add('${msg.sender.hex}> ${msg.content}'));
 
       // Alice sends the first message.
-      await aliceConvo.send("hello Bob, it's me Alice!");
+      await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
 
       // And Bob see the message in the conversation.
-      var bobMessages = await bobConvo.listMessages();
+      var bobMessages = await bob.listMessages(bobConvo);
       expect(bobMessages.length, 1);
       expect(bobMessages[0].sender, aliceWallet.address);
       expect(bobMessages[0].content, "hello Bob, it's me Alice!");
 
       // Bob replies
-      await bobConvo.send("oh, hello Alice!");
+      await bob.sendMessage(bobConvo, "oh, hello Alice!");
 
-      var aliceMessages = await aliceConvo.listMessages();
+      var aliceMessages = await alice.listMessages(aliceConvo);
       expect(aliceMessages.length, 2);
       expect(aliceMessages[0].sender, bobWallet.address);
       expect(aliceMessages[0].content, "oh, hello Alice!");
@@ -111,7 +111,7 @@ void main() {
       var conversations = await v2.listConversations();
       for (var convo in conversations) {
         debugPrint("dm w/ ${convo.peer}");
-        var dms = await convo.listMessages();
+        var dms = await v2.listMessages(convo);
         for (var j = 0; j < dms.length; ++j) {
           var dm = dms[j];
           debugPrint("${dm.sentAt} ${dm.sender.hexEip55}> ${dm.content}");

@@ -121,20 +121,23 @@ extension AuthCredentials on Credentials {
     // This prompt includes an `UnsignedPublicKey` of `identity`
     // that is serialized and included in the signed message text.
     var unsigned = identity.toUnsignedPublicKey();
-    var text = SignatureText.createIdentity(unsigned.writeToBuffer());
+    var text = SignatureSubject.createIdentity(unsigned.writeToBuffer());
     var sig = await _signPersonalMessageText(text);
     var identityKey = xmtp.PrivateKey(
       secp256k1: xmtp.PrivateKey_Secp256k1(bytes: identity.privateKey),
       publicKey: unsigned
         ..signature = xmtp.Signature(
-          ecdsaCompact: sig.toEcdsaCompact(),
+          walletEcdsaCompact: sig.toWalletEcdsaCompact(),
         ),
     );
 
     // Now we have the `identity` so we use it authorize a preKey.
     var pre = EthPrivateKey.createRandom(Random.secure());
     var unsignedPre = pre.toUnsignedPublicKey();
-    var preSig = await pre.signToSignature(unsignedPre.writeToBuffer());
+    var preDigest = await SignatureSubject.createPreKey(
+      unsignedPre.writeToBuffer(),
+    );
+    var preSig = sign(preDigest, identity.privateKey);
     var preKey = xmtp.PrivateKey(
       secp256k1: xmtp.PrivateKey_Secp256k1(bytes: pre.privateKey),
       publicKey: unsignedPre
@@ -181,7 +184,8 @@ extension AuthCredentials on Credentials {
   /// This is used by both the saving and loading of stored keys.
   Future<Uint8List> _enableIdentity(List<int> walletPreKey) async {
     // Initiate a personal signature to "Enable Identity".
-    return _signPersonalMessageText(SignatureText.enableIdentity(walletPreKey));
+    return _signPersonalMessageText(
+        SignatureSubject.enableIdentity(walletPreKey));
   }
 
   Future<Uint8List> _signPersonalMessageText(String text) {
@@ -340,7 +344,10 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
     var sig = await identity.signToSignature(authDataBytes);
 
     var token = xmtp.Token(
-      identityKey: v1.identityKey.publicKey,
+      // The backend expects a signature of type ECDSA not WalletECDSA.
+      identityKey: xmtp.PublicKey()
+        ..mergeFromMessage(v1.identityKey.publicKey)
+        ..signature = v1.identityKey.publicKey.signature.toEcdsa(),
       authDataBytes: authDataBytes,
       authDataSignature: xmtp.Signature(
         ecdsaCompact: sig.toEcdsaCompact(),

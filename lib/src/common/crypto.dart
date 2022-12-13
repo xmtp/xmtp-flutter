@@ -105,16 +105,26 @@ Uint8List compute3DHSecret(
 }
 
 /// This creates an [ECPublicKey] from the raw secp256k1 public key `bytes`.
-ECPublicKey createECPublicKey(List<int> bytes) => ECPublicKey(
-    _params.curve.decodePoint(
-        // Add the 0x04 byte prefix if it's missing.
-        // The prefix indicates that it is uncompressed.
-        Uint8List.fromList(bytes[0] == 0x04 ? bytes : ([0x04] + bytes)))!,
-    _params);
+ECPublicKey createECPublicKey(List<int> bytes) {
+  if (bytes.length == 64) {
+    // Add the 0x04 byte prefix if it's missing.
+    // The prefix indicates that it is uncompressed.
+    bytes = [0x04] + bytes;
+  }
+  if (bytes.length != 65) {
+    throw ArgumentError("invalid public key length (expected 65): $bytes");
+  }
+  return ECPublicKey(
+    _params.curve.decodePoint(bytes),
+    _params,
+  );
+}
 
 /// This creates an [ECPrivateKey] from the raw secp256k1 private key `bytes`.
-ECPrivateKey createECPrivateKey(List<int> bytes) =>
-    ECPrivateKey(bytesToUnsignedInt(Uint8List.fromList(bytes)), _params);
+ECPrivateKey createECPrivateKey(List<int> bytes) => ECPrivateKey(
+      bytesToUnsignedInt(Uint8List.fromList(bytes)),
+      _params,
+    );
 
 final _rand = Random.secure();
 
