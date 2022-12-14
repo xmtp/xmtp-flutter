@@ -268,9 +268,12 @@ extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
   }
 
   /// Create the v1 bundle for these keys.
+  /// Note: v1 bundles sign their identity key with type .ecdsaCompact
   xmtp.PrivateKeyBundleV1 toV1() {
     if (whichVersion() == xmtp.PrivateKeyBundle_Version.v1) {
-      return v1;
+      return v1
+        ..identityKey.publicKey.signature =
+            v1.identityKey.publicKey.signature.toEcdsa();
     }
     var unsignedPublic =
         xmtp.UnsignedPublicKey.fromBuffer(v2.identityKey.publicKey.keyBytes);
@@ -285,14 +288,17 @@ extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
               secp256k1Uncompressed: xmtp.PublicKey_Secp256k1Uncompressed(
                 bytes: unsignedPublic.secp256k1Uncompressed.bytes,
               ),
-              signature: v2.identityKey.publicKey.signature,
+              signature: v2.identityKey.publicKey.signature.toEcdsa(),
             )));
   }
 
   /// Create the v2 bundle for these keys.
+  /// Note: v2 bundles sign their identity key with type .walletEcdsaCompact
   xmtp.PrivateKeyBundleV2 toV2() {
     if (whichVersion() == xmtp.PrivateKeyBundle_Version.v2) {
-      return v2;
+      return v2
+        ..identityKey.publicKey.signature =
+            v1.identityKey.publicKey.signature.toWalletEcdsa();
     }
     return xmtp.PrivateKeyBundleV2(
         identityKey: xmtp.SignedPrivateKey(
@@ -306,7 +312,7 @@ extension CompatPrivateKeyBundle on xmtp.PrivateKeyBundle {
           secp256k1Uncompressed: v1.identityKey.publicKey.secp256k1Uncompressed,
           // NOTE: the keyBytes that was signed does not include the .signature
         ).writeToBuffer(),
-        signature: v1.identityKey.publicKey.signature,
+        signature: v1.identityKey.publicKey.signature.toWalletEcdsa(),
       ),
     ));
   }

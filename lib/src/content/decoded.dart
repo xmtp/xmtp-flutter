@@ -74,10 +74,14 @@ class DecodedMessage {
 }
 
 /// This represents the result of decoding content.
-/// See [Client.decodeContent].
 class DecodedContent {
   final xmtp.ContentTypeId contentType;
   final Object content;
 
   DecodedContent(this.contentType, this.content);
+}
+
+/// This marks something that can decode content.
+abstract class ContentDecoder {
+  Future<DecodedContent> decodeContent(xmtp.EncodedContent encoded);
 }

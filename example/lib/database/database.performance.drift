@@ -1,0 +1,17 @@
+import 'database.dart';
+
+-- For reference: https://drift.simonbinder.eu/docs/using-sql/drift_files/
+
+-- Speed up queries that list messages in chronological order.
+CREATE INDEX message_topic_sent_at ON messages (topic, sent_at);
+
+-- Calculate the unread number for the badge on the app.
+selectTotalUnreadMessageCount: SELECT COUNT(*) FROM messages
+    INNER JOIN conversations ON messages.topic = conversations.topic
+    WHERE messages.sent_at > conversations.last_opened_at;
+
+-- Decide if a conversation should indicate it has unread messages.
+selectUnreadMessageCount: SELECT COUNT(*) FROM messages
+    INNER JOIN conversations ON messages.topic = conversations.topic
+    WHERE messages.sent_at > conversations.last_opened_at
+    AND messages.topic = :topic;

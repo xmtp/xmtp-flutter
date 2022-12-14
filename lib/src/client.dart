@@ -56,7 +56,7 @@ import 'conversation/manager.dart';
 /// And each [DecodedMessage] is uniquely identified by its [DecodedMessage.id].
 /// See note re "Offline Storage" atop [DecodedMessage].
 ///
-class Client {
+class Client implements ContentDecoder {
   final EthereumAddress address;
 
   xmtp.PrivateKeyBundle get keys => _auth.keys;
@@ -190,6 +190,7 @@ class Client {
   /// This method is exposed to help support offline storage of the
   /// otherwise unwieldy content.
   /// See note re "Offline Storage" atop [DecodedMessage].
+  @override
   Future<DecodedContent> decodeContent(xmtp.EncodedContent encoded) =>
       _codecs.decodeContent(encoded);
 }

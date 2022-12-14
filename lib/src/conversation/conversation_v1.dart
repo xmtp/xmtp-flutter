@@ -75,9 +75,9 @@ class ConversationManagerV1 {
   }
 
   Stream<Conversation> streamConversations() => _api.client
-      .subscribe(xmtp.SubscribeRequest(
-        contentTopics: [Topic.userIntro(_me.hex)],
-      ))
+      .subscribe(xmtp.SubscribeRequest(contentTopics: [
+        Topic.userIntro(_me.hex),
+      ]))
       .map((e) => xmtp.Message.fromBuffer(e.message))
       .asyncMap((msg) => _conversationFromIntro(msg));
 
@@ -116,9 +116,7 @@ class ConversationManagerV1 {
 
   Stream<DecodedMessage> streamMessages(Conversation conversation) =>
       _api.client
-          .subscribe(xmtp.SubscribeRequest(
-            contentTopics: [conversation.topic],
-          ))
+          .subscribe(xmtp.SubscribeRequest(contentTopics: [conversation.topic]))
           .map((e) => xmtp.Message.fromBuffer(e.message))
           .asyncMap((msg) => _decodedFromMessage(msg));
 

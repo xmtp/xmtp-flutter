@@ -35,7 +35,7 @@ class Api {
     return Api.createAdvanced(
       channel,
       options: grpc.CallOptions(
-        timeout: const Duration(seconds: 30),
+        timeout: const Duration(minutes: 5),
         // TODO: consider supporting compression
         // compression: const grpc.GzipCodec(),
       ),

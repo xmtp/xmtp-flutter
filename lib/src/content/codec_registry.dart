@@ -6,7 +6,7 @@ import 'text_codec.dart';
 
 /// This is a registry of codecs for particular types.
 /// It knows how to apply the codecs to [decodeContent] or [encodeContent].
-class CodecRegistry {
+class CodecRegistry implements ContentDecoder {
   final Map<String, Codec> _codecs = {};
 
   void registerCodec(Codec codec) => _codecs[_key(codec.contentType)] = codec;
@@ -16,6 +16,7 @@ class CodecRegistry {
   Codec? _codecFor(xmtp.ContentTypeId type) => _codecs[_key(type)];
 
   /// Use the registered codecs to decode the [encoded] content.
+  @override
   Future<DecodedContent> decodeContent(xmtp.EncodedContent encoded) async {
     var codec = _codecFor(encoded.type);
     if (codec == null) {
