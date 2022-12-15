@@ -4,7 +4,9 @@ import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 import 'common/api.dart';
 import 'auth.dart';
 import 'contact.dart';
+import 'content/codec.dart';
 import 'content/codec_registry.dart';
+import 'content/composite_codec.dart';
 import 'content/text_codec.dart';
 import 'content/decoded.dart';
 import 'conversation/conversation.dart';
@@ -56,7 +58,7 @@ import 'conversation/manager.dart';
 /// And each [DecodedMessage] is uniquely identified by its [DecodedMessage.id].
 /// See note re "Offline Storage" atop [DecodedMessage].
 ///
-class Client implements ContentDecoder {
+class Client implements Codec<DecodedContent> {
   final EthereumAddress address;
 
   xmtp.PrivateKeyBundle get keys => _auth.keys;
@@ -78,10 +80,11 @@ class Client implements ContentDecoder {
   /// trigger signature prompts to acquire user authentication keys.
   static Future<Client> createFromWallet(
     Api api,
-    Credentials wallet,
-  ) async {
+    Credentials wallet, {
+    List<Codec> customCodecs = const [],
+  }) async {
     var address = await wallet.extractAddress();
-    var client = await _createUninitialized(api, address);
+    var client = await _createUninitialized(api, address, customCodecs);
     await client._auth.authenticateWithCredentials(wallet);
     await client._contacts.ensureSavedContact(client._auth.keys);
     return client;
@@ -91,10 +94,11 @@ class Client implements ContentDecoder {
   /// previously successful authentication.
   static Future<Client> createFromKeys(
     Api api,
-    xmtp.PrivateKeyBundle keys,
-  ) async {
+    xmtp.PrivateKeyBundle keys, {
+    List<Codec> customCodecs = const [],
+  }) async {
     var address = keys.wallet;
-    var client = await _createUninitialized(api, address);
+    var client = await _createUninitialized(api, address, customCodecs);
     await client._auth.authenticateWithKeys(keys);
     await client._contacts.ensureSavedContact(client._auth.keys);
     return client;
@@ -106,12 +110,16 @@ class Client implements ContentDecoder {
   static Future<Client> _createUninitialized(
     Api api,
     EthereumAddress address,
+    List<Codec> customCodecs,
   ) async {
     var auth = AuthManager(address, api);
     var contacts = ContactManager(api);
     var codecs = CodecRegistry();
     codecs.registerCodec(TextCodec());
-    // TODO: codecs.registerCodec(CompositeCodec(codecs));
+    codecs.registerCodec(CompositeCodec(codecs));
+    for (var codec in customCodecs) {
+      codecs.registerCodec(codec);
+    }
     var v1 = ConversationManagerV1(address, api, auth, codecs, contacts);
     var v2 = ConversationManagerV2(address, api, auth, codecs, contacts);
     var conversations = ConversationManager(contacts, v1, v2);
@@ -184,13 +192,25 @@ class Client implements ContentDecoder {
         contentType: contentType,
       );
 
-  /// This uses all registered codecs to decode the [encoded] content.
+  /// These use all registered codecs to decode and encode content.
   ///
-  /// Decoding happens automatically when you [listMessages] or [streamMessages].
-  /// This method is exposed to help support offline storage of the
+  /// This happens automatically when you [listMessages] or [streamMessages]
+  /// and also when you [sendMessage].
+  ///
+  /// These method are exposed to help support offline storage of the
   /// otherwise unwieldy content.
   /// See note re "Offline Storage" atop [DecodedMessage].
   @override
-  Future<DecodedContent> decodeContent(xmtp.EncodedContent encoded) =>
-      _codecs.decodeContent(encoded);
+  Future<DecodedContent> decode(xmtp.EncodedContent encoded) =>
+      _codecs.decode(encoded);
+
+  @override
+  Future<xmtp.EncodedContent> encode(DecodedContent decoded) =>
+      _codecs.encode(decoded);
+
+  /// This completes the implementation of the [Codec] interface.
+  @override
+  xmtp.ContentTypeId get contentType => throw UnsupportedError(
+        "the Client, as a Codec, does not advertise a single content type",
+      );
 }

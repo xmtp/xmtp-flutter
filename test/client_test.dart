@@ -3,8 +3,10 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
+import 'package:xmtp/src/content/codec.dart';
 import 'package:xmtp/src/client.dart';
 
 import 'test_server.dart';
@@ -117,6 +119,48 @@ void main() {
     },
   );
 
+  // This uses a custom codec to send integers between two people.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "codecs: using a custom codec for integers",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobApi = createTestServerApi();
+      var alice = await Client.createFromWallet(
+        aliceApi,
+        aliceWallet,
+        customCodecs: [IntegerCodec()],
+      );
+      var bob = await Client.createFromWallet(
+        bobApi,
+        bobWallet,
+        customCodecs: [IntegerCodec()],
+      );
+
+      var convo = await alice.newConversation(bob.address.hex);
+
+      await alice.sendMessage(convo, "Here's a number:");
+      await alice.sendMessage(convo, 12345, contentType: contentTypeInteger);
+
+      expect((await bob.listMessages(convo)).map((m) => m.content).toList(), [
+        12345,
+        "Here's a number:",
+      ]);
+
+      await bob.sendMessage(convo, "Cool. Here's another:");
+      await bob.sendMessage(convo, 67890, contentType: contentTypeInteger);
+
+      expect((await alice.listMessages(convo)).map((m) => m.content).toList(), [
+        67890,
+        "Cool. Here's another:",
+        12345,
+        "Here's a number:",
+      ]);
+    },
+  );
+
   // This connects to the dev network to test the client.
   // NOTE: it requires a private key
   test(
@@ -139,4 +183,29 @@ void main() {
       }
     },
   );
+}
+
+/// Simple [Codec] for sending [int] values around.
+///
+/// This encodes it as an 8 byte (64 bit) array.
+final contentTypeInteger = xmtp.ContentTypeId(
+  authorityId: "com.example",
+  typeId: "integer",
+  versionMajor: 0,
+  versionMinor: 1,
+);
+
+class IntegerCodec extends Codec<int> {
+  @override
+  xmtp.ContentTypeId get contentType => contentTypeInteger;
+
+  @override
+  Future<int> decode(xmtp.EncodedContent encoded) async =>
+      Uint8List.fromList(encoded.content).buffer.asByteData().getInt64(0);
+
+  @override
+  Future<xmtp.EncodedContent> encode(int decoded) async => xmtp.EncodedContent(
+        type: contentTypeInteger,
+        content: Uint8List(8)..buffer.asByteData().setInt64(0, decoded),
+      );
 }

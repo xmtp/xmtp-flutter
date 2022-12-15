@@ -5,8 +5,10 @@ import 'decoded.dart';
 import 'text_codec.dart';
 
 /// This is a registry of codecs for particular types.
-/// It knows how to apply the codecs to [decodeContent] or [encodeContent].
-class CodecRegistry implements ContentDecoder {
+///
+/// It knows how to apply the codecs to [decode] or [encode]
+/// [xmtp.EncodedContent] to [DecodedContent]..
+class CodecRegistry implements Codec<DecodedContent> {
   final Map<String, Codec> _codecs = {};
 
   void registerCodec(Codec codec) => _codecs[_key(codec.contentType)] = codec;
@@ -17,7 +19,7 @@ class CodecRegistry implements ContentDecoder {
 
   /// Use the registered codecs to decode the [encoded] content.
   @override
-  Future<DecodedContent> decodeContent(xmtp.EncodedContent encoded) async {
+  Future<DecodedContent> decode(xmtp.EncodedContent encoded) async {
     var codec = _codecFor(encoded.type);
     if (codec == null) {
       if (encoded.hasFallback()) {
@@ -31,15 +33,17 @@ class CodecRegistry implements ContentDecoder {
   }
 
   /// Use the registered codecs to encode the [content].
-  Future<xmtp.EncodedContent> encodeContent(
-    xmtp.ContentTypeId? type,
-    Object content,
-  ) async {
-    type ??= contentTypeText;
+  @override
+  Future<xmtp.EncodedContent> encode(DecodedContent decoded) async {
+    var type = decoded.contentType;
     var codec = _codecFor(type);
     if (codec == null) {
       throw StateError("unable to encode unsupported type ${_key(type)}");
     }
-    return codec.encode(content);
+    return codec.encode(decoded.content);
   }
+
+  @override
+  xmtp.ContentTypeId get contentType =>
+      throw UnsupportedError("the registry, as a Codec, has no content type");
 }

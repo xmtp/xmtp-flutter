@@ -120,7 +120,7 @@ class ConversationManagerV2 {
     xmtp.ContentTypeId? contentType,
   }) async {
     contentType ??= contentTypeText;
-    var encoded = await _codecs.encodeContent(contentType, content);
+    var encoded = await _codecs.encode(DecodedContent(contentType, content));
     var header = xmtp.MessageHeaderV2(
       topic: conversation.topic,
       createdNs: nowNs(),
@@ -168,7 +168,7 @@ class ConversationManagerV2 {
   ) async {
     var signed = await _decryptMessageV2(msg.v2, conversation.invite);
     var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
-    var decoded = await _codecs.decodeContent(encoded);
+    var decoded = await _codecs.decode(encoded);
     return _createDecodedMessage(
       msg,
       signed,

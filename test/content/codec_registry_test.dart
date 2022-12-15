@@ -2,16 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/content/codec_registry.dart';
+import 'package:xmtp/src/content/decoded.dart';
 import 'package:xmtp/src/content/text_codec.dart';
 
 void main() {
   test('known types should be encoded and decoded', () async {
     var registry = CodecRegistry();
     registry.registerCodec(TextCodec());
-    var encoded = await registry.encodeContent(contentTypeText, "foo bar");
+    var encoded =
+        await registry.encode(DecodedContent(contentTypeText, "foo bar"));
     expect(encoded.type, contentTypeText);
     expect(encoded.content.isNotEmpty, true);
-    var decoded = await registry.decodeContent(encoded);
+    var decoded = await registry.decode(encoded);
     expect(decoded.contentType, contentTypeText);
     expect(decoded.content, "foo bar");
   });
@@ -24,11 +26,11 @@ void main() {
       typeId: "unknown",
     );
     expect(
-      () async => await registry.encodeContent(unknownType, "foo bar"),
+      () async => await registry.encode(DecodedContent(unknownType, "foo bar")),
       throwsStateError,
     );
     expect(
-      () async => await registry.decodeContent(
+      () async => await registry.decode(
         xmtp.EncodedContent(type: unknownType, content: [0x01, 0x02]),
       ),
       throwsStateError,
@@ -43,7 +45,7 @@ void main() {
       authorityId: "example.com",
       typeId: "unsupported",
     );
-    var decoded = await registry.decodeContent(
+    var decoded = await registry.decode(
       xmtp.EncodedContent(
         type: unsupportedType,
         content: [0x01, 0x02],

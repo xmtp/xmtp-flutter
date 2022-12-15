@@ -78,7 +78,7 @@ class Messages extends Table {
   include: {'database.performance.drift'},
 )
 class Database extends _$Database {
-  final xmtp.ContentDecoder decoder;
+  final xmtp.Codec<xmtp.DecodedContent> decoder;
 
   Database(this.decoder, QueryExecutor executor) : super(executor);
 
@@ -89,7 +89,7 @@ class Database extends _$Database {
   ///
   /// Since message content is stored as [xmtp.EncodedContent], this
   /// uses the [decoder] to get [xmtp.DecodedMessage.content] for display.
-  static Database create(xmtp.ContentDecoder decoder) {
+  static Database create(xmtp.Codec<xmtp.DecodedContent> decoder) {
     configureSqlCipherLibraries();
     return Database(decoder, LazyDatabase(() async {
       var docs = await getApplicationDocumentsDirectory();
