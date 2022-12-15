@@ -54,9 +54,14 @@ class ConversationManager {
 
   /// This lists all [Conversation]s for the user.
   /// TODO: consider a more thoughtful sorting of v1/v2
-  Future<List<Conversation>> listConversations() async {
-    var invites = await _v2.listConversations();
-    var intros = await _v1.listConversations();
+  Future<List<Conversation>> listConversations([
+    DateTime? start,
+    DateTime? end,
+    int? limit,
+    xmtp.SortDirection? sort,
+  ]) async {
+    var invites = await _v2.listConversations(start, end, limit, sort);
+    var intros = await _v1.listConversations(start, end, limit, sort);
     return [...invites, ...intros];
   }
 
@@ -70,11 +75,15 @@ class ConversationManager {
 
   /// This lists the messages in [conversation].
   Future<List<DecodedMessage>> listMessages(
-    Conversation conversation,
-  ) =>
+    Conversation conversation, [
+    DateTime? start,
+    DateTime? end,
+    int? limit,
+    xmtp.SortDirection? sort,
+  ]) =>
       conversation.version == xmtp.Message_Version.v1
-          ? _v1.listMessages(conversation)
-          : _v2.listMessages(conversation);
+          ? _v1.listMessages(conversation, start, end, limit, sort)
+          : _v2.listMessages(conversation, start, end, limit, sort);
 
   /// This exposes a stream of new messages in [conversation].
   Stream<DecodedMessage> streamMessages(

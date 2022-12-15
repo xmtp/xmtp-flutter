@@ -133,8 +133,20 @@ class Client implements Codec<DecodedContent> {
   }
 
   /// This lists all the [Conversation]s for the user.
-  Future<List<Conversation>> listConversations() =>
-      _conversations.listConversations();
+  ///
+  /// If [start] or [end] are specified then this will only list conversations
+  /// created at or after [start] and at or before [end].
+  ///
+  /// If [limit] is specified then this returns no more than [limit] conversations.
+  ///
+  /// If [sort] is specified then that will control the sort order.
+  Future<List<Conversation>> listConversations({
+    DateTime? start,
+    DateTime? end,
+    int? limit,
+    xmtp.SortDirection? sort = xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
+  }) =>
+      _conversations.listConversations(start, end, limit, sort);
 
   /// This exposes a stream of new [Conversation]s for the user.
   Stream<Conversation> streamConversations() =>
@@ -166,11 +178,21 @@ class Client implements Codec<DecodedContent> {
       _conversations.newConversation(address, conversationId, metadata);
 
   /// This lists messages sent to the [conversation].
-  // TODO: support listing params per js-lib
+  ///
+  /// If [start] or [end] are specified then this will only list messages
+  /// sent at or after [start] and at or before [end].
+  ///
+  /// If [limit] is specified then this returns no more than [limit] messages.
+  ///
+  /// If [sort] is specified then that will control the sort order.
   Future<List<DecodedMessage>> listMessages(
-    Conversation conversation,
-  ) =>
-      _conversations.listMessages(conversation);
+    Conversation conversation, {
+    DateTime? start,
+    DateTime? end,
+    int? limit,
+    xmtp.SortDirection sort = xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
+  }) =>
+      _conversations.listMessages(conversation, start, end, limit, sort);
 
   /// This exposes a stream of new messages sent to the [conversation].
   Stream<DecodedMessage> streamMessages(Conversation conversation) =>

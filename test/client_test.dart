@@ -78,6 +78,50 @@ void main() {
     },
   );
 
+  // This lists conversations and messages using various listing options.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "listing and sorting parameters",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+
+      // Give contacts a moment to propagate.
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      var convo = await alice.newConversation(bob.address.hex,
+          conversationId: "example.com");
+      await alice.sendMessage(convo, "first message to convo");
+      await Future.delayed(const Duration(milliseconds: 100));
+      await alice.sendMessage(convo, "second message to convo");
+      await Future.delayed(const Duration(milliseconds: 100));
+      await alice.sendMessage(convo, "third message to convo");
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      var messages = await alice.listMessages(
+        convo,
+        limit: 2,
+        sort: xmtp.SortDirection.SORT_DIRECTION_ASCENDING,
+      );
+      expect(messages.length, 2);
+      expect(messages[0].content, "first message to convo");
+      expect(messages[1].content, "second message to convo");
+
+      messages = await alice.listMessages(
+        convo,
+        limit: 2,
+        sort: xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
+      );
+      expect(messages.length, 2);
+      expect(messages[0].content, "third message to convo");
+      expect(messages[1].content, "second message to convo");
+    },
+  );
+
   // This conducts two distinct conversations between the same two users.
   test(
     skip: skipUnlessTestServerEnabled,
@@ -89,6 +133,9 @@ void main() {
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
+
+      // Give contacts a moment to propagate.
+      await Future.delayed(const Duration(milliseconds: 100));
 
       var work = await alice.newConversation(
         bob.address.hex,

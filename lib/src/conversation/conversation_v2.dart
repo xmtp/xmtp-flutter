@@ -73,10 +73,20 @@ class ConversationManagerV2 {
   }
 
   /// This returns the list of all invited [Conversation]s.
-  Future<List<Conversation>> listConversations() async {
+  Future<List<Conversation>> listConversations([
+    DateTime? start,
+    DateTime? end,
+    int? limit,
+    xmtp.SortDirection? sort,
+  ]) async {
     var listing = await _api.client.query(xmtp.QueryRequest(
       contentTopics: [Topic.userInvite(_me.hex)],
-      // TODO: support listing params per js-lib
+      startTimeNs: start?.toNs64(),
+      endTimeNs: end?.toNs64(),
+      pagingInfo: xmtp.PagingInfo(
+        limit: limit,
+        direction: sort,
+      ),
     ));
     var conversations = await Future.wait(listing.envelopes
         .map((e) => xmtp.SealedInvitation.fromBuffer(e.message))
@@ -141,11 +151,20 @@ class ConversationManagerV2 {
 
   /// This lists the current messages in the [conversation]
   Future<List<DecodedMessage>> listMessages(
-    Conversation conversation,
-  ) async {
+    Conversation conversation, [
+    DateTime? start,
+    DateTime? end,
+    int? limit,
+    xmtp.SortDirection? sort,
+  ]) async {
     var listing = await _api.client.query(xmtp.QueryRequest(
       contentTopics: [conversation.topic],
-      // TODO: support listing params per js-lib
+      startTimeNs: start?.toNs64(),
+      endTimeNs: end?.toNs64(),
+      pagingInfo: xmtp.PagingInfo(
+        limit: limit,
+        direction: sort,
+      ),
     ));
     return Future.wait(listing.envelopes
         .map((e) => xmtp.Message.fromBuffer(e.message))
