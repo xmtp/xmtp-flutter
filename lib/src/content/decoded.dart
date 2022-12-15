@@ -81,7 +81,18 @@ class DecodedContent {
   DecodedContent(this.contentType, this.content);
 }
 
-/// This marks something that can decode content.
-abstract class ContentDecoder {
-  Future<DecodedContent> decodeContent(xmtp.EncodedContent encoded);
+/// A composite of potentially multiple parts of decoded content.
+///
+/// This is either decoded [content] itself.
+/// Or it is a list of [parts] of further [DecodedComposite]s.
+///
+/// This is the decoded edition of [xmtp.Composite].
+class DecodedComposite {
+  final DecodedContent? content;
+  final List<DecodedComposite> parts;
+
+  bool get hasContent => content != null;
+
+  DecodedComposite.ofContent(this.content) : parts = [];
+  DecodedComposite.withParts(this.parts) : content = null;
 }

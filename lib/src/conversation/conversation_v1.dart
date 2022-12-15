@@ -84,7 +84,7 @@ class ConversationManagerV1 {
   Future<Conversation> _conversationFromIntro(xmtp.Message msg) async {
     var header = xmtp.MessageHeaderV1.fromBuffer(msg.v1.headerBytes);
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
-    var decoded = await _codecs.decodeContent(encoded);
+    var decoded = await _codecs.decode(encoded);
     var intro = await _createDecodedMessage(
       msg,
       decoded.contentType,
@@ -123,7 +123,7 @@ class ConversationManagerV1 {
   /// This decrypts and decodes the [xmtp.Message].
   Future<DecodedMessage> _decodedFromMessage(xmtp.Message msg) async {
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
-    var decoded = await _codecs.decodeContent(encoded);
+    var decoded = await _codecs.decode(encoded);
     return _createDecodedMessage(
       msg,
       decoded.contentType,
@@ -138,7 +138,7 @@ class ConversationManagerV1 {
     xmtp.ContentTypeId? contentType,
   }) async {
     contentType ??= contentTypeText;
-    var encoded = await _codecs.encodeContent(contentType, content);
+    var encoded = await _codecs.encode(DecodedContent(contentType, content));
     var peerContact = await _contacts.getUserContactV1(conversation.peer.hex);
     var encrypted = await encryptMessageV1(
       _auth.keys,
