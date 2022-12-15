@@ -69,6 +69,21 @@ extension SignatureConverters on xmtp.Signature {
     return xmtp.Signature();
   }
 
+  xmtp.Signature toWalletEcdsa() {
+    if (whichUnion() == xmtp.Signature_Union.walletEcdsaCompact) {
+      return this;
+    }
+    if (whichUnion() == xmtp.Signature_Union.ecdsaCompact) {
+      return xmtp.Signature(
+        walletEcdsaCompact: xmtp.Signature_WalletECDSACompact(
+          bytes: ecdsaCompact.bytes,
+          recovery: ecdsaCompact.recovery,
+        ),
+      );
+    }
+    return xmtp.Signature();
+  }
+
   MsgSignature toMsgSignature() {
     var bytes = whichUnion() == xmtp.Signature_Union.walletEcdsaCompact
         ? walletEcdsaCompact.bytes

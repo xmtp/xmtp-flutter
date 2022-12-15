@@ -200,12 +200,16 @@ xmtp.SignedPublicKey _toSignedPublicKey(xmtp.PublicKey v1) =>
 /// This creates a [v1] [xmtp.ContactBundle] from a [xmtp.PrivateKeyBundle].
 xmtp.ContactBundle createContactBundleV1(xmtp.PrivateKeyBundle keys) {
   var isAlreadyV1 = keys.whichVersion() == xmtp.PrivateKeyBundle_Version.v1;
+
+  var identityKey = isAlreadyV1
+      ? keys.v1.identityKey.publicKey
+      : _toPublicKey(keys.v2.identityKey.publicKey);
   return xmtp.ContactBundle(
     v1: xmtp.ContactBundleV1(
       keyBundle: xmtp.PublicKeyBundle(
-        identityKey: isAlreadyV1
-            ? keys.v1.identityKey.publicKey
-            : _toPublicKey(keys.v2.identityKey.publicKey),
+        identityKey: xmtp.PublicKey()
+          ..mergeFromMessage(identityKey)
+          ..signature = identityKey.signature.toEcdsa(),
         preKey: isAlreadyV1
             ? keys.v1.preKeys.first.publicKey
             : _toPublicKey(keys.v2.preKeys.first.publicKey),

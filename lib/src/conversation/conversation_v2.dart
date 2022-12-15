@@ -88,9 +88,9 @@ class ConversationManagerV2 {
 
   /// This exposes a stream of new [Conversation]s.
   Stream<Conversation> streamConversations() => _api.client
-      .subscribe(xmtp.SubscribeRequest(
-        contentTopics: [Topic.userInvite(_me.hex)],
-      ))
+      .subscribe(xmtp.SubscribeRequest(contentTopics: [
+        Topic.userInvite(_me.hex),
+      ]))
       .map((e) => xmtp.SealedInvitation.fromBuffer(e.message))
       .asyncMap((sealed) => _conversationFromInvite(sealed));
 
@@ -157,9 +157,7 @@ class ConversationManagerV2 {
     Conversation conversation,
   ) =>
       _api.client
-          .subscribe(xmtp.SubscribeRequest(
-            contentTopics: [conversation.topic],
-          ))
+          .subscribe(xmtp.SubscribeRequest(contentTopics: [conversation.topic]))
           .map((e) => xmtp.Message.fromBuffer(e.message))
           .asyncMap((msg) => _decodedFromMessage(conversation, msg));
 
