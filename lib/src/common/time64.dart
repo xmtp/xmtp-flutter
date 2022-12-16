@@ -23,3 +23,10 @@ extension DateTimeInt64 on Int64 {
 
   Int64 toNs() => this > _nsThreshold ? this : this * 1000000;
 }
+
+/// This adds helpers to [DateTime] produce [Int64] timestamps.
+extension Int64DateTime on DateTime {
+  Int64 toMs64() => Int64(millisecondsSinceEpoch);
+
+  Int64 toNs64() => Int64(millisecondsSinceEpoch) * 1000000;
+}
