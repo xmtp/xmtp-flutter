@@ -1,0 +1,16 @@
+name: Release
+on:
+  push:
+    branches:
+      - main
+jobs:
+  dart:
+    name: Release (dart)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dart-lang/setup-dart@v1.3
+      - run: dart pub get
+      - run: dart test
+      - run: dart pub publish --dry-run
+      # TODO: drop "--dry-run" to auto-publish to pub.dev
