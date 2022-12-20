@@ -1,6 +1,6 @@
 # xmtp-flutter
 
-![Test](https://github.com/xmtp/xmtp-flutter/actions/workflows/test.yml/badge.svg) ![Status](https://camo.githubusercontent.com/5bb5892781bbf711c7fe5eba3328e9e15a767de87c587d3fb65f2fd7e1f4ae72/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f50726f6a6563745f5374617475732d446576656c6f7065725f507265766965772d726564)
+![Test](https://github.com/xmtp/xmtp-flutter/actions/workflows/test.yml/badge.svg) ![Status](https://img.shields.io/badge/Project_Status-Developer_Preview-yellow)
 
 `xmtp-flutter` provides a Dart implementation of an XMTP message API client for use with Flutter apps.
 
