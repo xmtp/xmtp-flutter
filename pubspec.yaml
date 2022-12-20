@@ -1,6 +1,6 @@
 name: xmtp
 description: XMTP client SDK for Flutter applications.
-version: 0.0.1-development
+version: 0.0.1-development.1
 repository: https://github.com/xmtp/xmtp-flutter
 
 environment:
