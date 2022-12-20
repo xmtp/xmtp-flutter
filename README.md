@@ -208,7 +208,7 @@ var myConversations = conversations.where((c) =>
 When sending a message, you can specify the type of content. This allows you to specify different
 types of content than the default (a simple string, `ContentTypeText`).
 
-Support for other types of content can be added during client construction by registering additional `ContentCodecs`, including a `customCodecs` parameter. Every codec declares a specific content type identifier,
+Support for other types of content can be added during client construction by registering additional `Codec`s, including a `customCodecs` parameter. Every codec declares a specific content type identifier,
 `ContentTypeId`, which is used to signal to the Client which codec should be used to process the
 content that is being sent or received. See [XIP-5](https://github.com/xmtp/XIPs/blob/main/XIPs/xip-5-message-content-types.md)
 for more details on codecs and content types.
