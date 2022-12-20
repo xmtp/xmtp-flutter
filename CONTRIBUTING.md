@@ -20,4 +20,10 @@ PRs are encouraged, but consider starting with a feature request to temperature-
 
 ## 🔧 Developing
 
-***dan provide this. See xmtp-ios for example content: https://github.com/xmtp/xmtp-ios/blob/main/CONTRIBUTING.md#-developing***
+You'll usually want to run a local XMTP node to test and use your app in isolation.
+
+Once you have [docker installed](https://docs.docker.com/get-docker/) you can run a local node
+with the following command from inside `tool/local-node`:
+```
+$ docker-compose -p xmtp -f docker-compose.yml up
+```
