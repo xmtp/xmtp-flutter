@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: dart-lang/setup-dart@v1.3
-      - run: dart pub get
-      - run: dart test
-      - run: dart pub publish --dry-run
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter pub publish --dry-run
       # TODO: drop "--dry-run" to auto-publish to pub.dev
