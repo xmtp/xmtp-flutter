@@ -8,7 +8,7 @@ Use `xmtp-flutter` to build with XMTP to send messages between blockchain accoun
 
 This SDK is in **Developer Preview** status and ready for you to start building.
 
-However, we do **not** recommend using Developer Preview software in production apps. 
+However, we do **not** recommend using Developer Preview software in production apps.
 Software in this status may change based on feedback.
 
 Follow along in the [tracking issue](https://github.com/xmtp/xmtp-flutter/issues/4) for updates.
@@ -23,7 +23,7 @@ For a basic demonstration of the core concepts and capabilities of the `xmtp-flu
 
 ## Reference docs
 
-See [xmtp library](https://pub.dev/documentation/xmtp/latest/xmtp/Client-class.html) for the Flutter client SDK reference documentation.
+See the [xmtp library](https://pub.dev/documentation/xmtp/latest/xmtp/Client-class.html) for the Flutter client SDK reference documentation.
 
 ## Install with Dart Package Manager
 
@@ -51,12 +51,12 @@ var client = await xmtp.Client.createFromWallet(api, wallet);
 
 The client has two constructors: `createFromWallet` and `createFromKeys`.
 
-The first time a user uses a new device they should call `createFromWallet`. This will prompt them
-to sign a message that either:
-- creates a new identity (if they're new) or 
-- enables their existing identity (if they've used XMTP before).
+The first time a user uses a new device, they should call `createFromWallet`. This will prompt them
+to sign a message to do one of the following:
+- Create a new identity (if they're new)
+- Enable their existing identity (if they've used XMTP before)
 
-When this succeeds it configures the client with a bundle of `keys` that can be stored securely on
+When this succeeds, it configures the client with a bundle of `keys` that can be stored securely on
 the device.
 
 ```dart
@@ -77,10 +77,10 @@ var client = await Client.createFromKeys(api, keys);
 
 ### Configure the client
 
-You can configure the client environment when you call `Api.create()`. 
+You can configure the client environment when you call `Api.create()`.
 
-By default it will connect to a `local` XMTP network. 
-For important details about connecting to environments, 
+By default, it will connect to a `local` XMTP network.
+For important details about connecting to environments,
 see [XMTP `production` and `dev` network environments](#xmtp-production-and-dev-network-environments).
 
 ### List existing conversations
@@ -97,7 +97,7 @@ for (var convo in conversations) {
 
 ### Listen for new conversations
 
-You can also listen for new conversations being started in real-time. 
+You can also listen for new conversations being started in real-time.
 This will allow apps to display incoming messages from new contacts.
 
 ```dart
@@ -118,13 +118,13 @@ var convo = await client.newConversation("0x...");
 
 ### Send messages
 
-To be able to send a message, the recipient must have already created a client at least once and 
-consequently advertised their key bundle on the network. 
+To be able to send a message, the recipient must have already created a client at least once and
+consequently advertised their key bundle on the network.
 
-Messages are addressed using account addresses. 
+Messages are addressed using account addresses.
 
-The message content can be a plain text string. Or you can configure custom content types. 
-See [Different Types of Content](#different-types-of-content) 
+The message content can be a plain text string. Or you can configure custom content types.
+See [Different types of content](#different-types-of-content).
 
 ```dart
 var convo = await client.newConversation("0x...");
@@ -143,7 +143,7 @@ var messages = await alice.listMessages(convo,
 
 ### List messages in a conversation with pagination
 
-It may be helpful to retrieve and process the messages in a conversation page by page. 
+It may be helpful to retrieve and process the messages in a conversation page by page.
 You can do this by specifying `limit` and `end` which will return the specified number
 of messages sent before that time.
 
@@ -155,12 +155,12 @@ var nextPage = await alice.listMessages(
 
 ### Listen for new messages in a conversation
 
-You can listen for any new messages (incoming or outgoing) in a conversation by calling 
+You can listen for any new messages (incoming or outgoing) in a conversation by calling
 `client.streamMessages(convo)`.
 
-A successfully received message (that makes it through the decoding and decryption) can be trusted 
-to be authentic. Authentic means that it was sent by the owner of the `message.sender` account and 
-that it wasn't modified in transit. The `message.sentAt` time can be trusted to have been set by 
+A successfully received message (that makes it through the decoding and decryption) can be trusted
+to be authentic. Authentic means that it was sent by the owner of the `message.sender` account and
+that it wasn't modified in transit. The `message.sentAt` time can be trusted to have been set by
 the sender.
 
 ```dart
@@ -171,16 +171,16 @@ var listening = client.streamMessages(convo).listen((message) {
 await listening.cancel();
 ```
 
-Note: This package does not currently include the `streamAllMessages()` functionality from the XMTP
+**Note:** This package does not currently include the `streamAllMessages()` functionality from the XMTP
 client SDK for JavaScript (xmtp-js).
 
 ### Handling multiple conversations with the same blockchain address
 
-With XMTP, you can have multiple ongoing conversations with the same blockchain address. 
-For example, you might want to have a conversation scoped to your particular app, or even 
+With XMTP, you can have multiple ongoing conversations with the same blockchain address.
+For example, you might want to have a conversation scoped to your particular app, or even
 a conversation scoped to a particular item in your app.
 
-To accomplish this, you can pass a context with a conversationId when you are creating 
+To accomplish this, you can pass a context with a conversationId when you are creating
 a conversation. We recommend conversation IDs start with a domain, to help avoid unwanted collisions
 between your app and other apps on the XMTP network.
 
@@ -188,35 +188,34 @@ between your app and other apps on the XMTP network.
 var friend = "0x123..."; // my friend's address
 
 var workTalk = await client.newConversation(
-  friend, 
-  conversationId: "my.example.com/work", 
+  friend,
+  conversationId: "my.example.com/work",
   metadata: {"title": "Work Talk"},
 );
 var playTalk = await client.newConversation(
-  friend, 
-  conversationId: "my.example.com/play", 
+  friend,
+  conversationId: "my.example.com/play",
   metadata: {"title": "Play Talk"},
 );
 
 var conversations = await client.listConversations();
 var myConversations = conversations.where((c) =>
-    c.conversationId.startsWith("my.example.com/")); 
+    c.conversationId.startsWith("my.example.com/"));
 ```
 
-## Different Types of Content
+## Different types of content
 
-When sending a message you can specify the type of content. This allows you to specify different
-types of content than the default (a simple string, `ContentTypeText`). 
+When sending a message, you can specify the type of content. This allows you to specify different
+types of content than the default (a simple string, `ContentTypeText`).
 
-Support for other types of content can be added during client construction by registering additional
-including a `customCodecs` parameter. Every codec declares a specific content type identifier,
-`ContentTypeId` which is used to signal to the Client which codec should be used to process the 
-content that is being sent or received. See [XIP-5](https://github.com/xmtp/XIPs/blob/main/XIPs/xip-5-message-content-types.md) 
+Support for other types of content can be added during client construction by registering additional `ContentCodecs`, including a `customCodecs` parameter. Every codec declares a specific content type identifier,
+`ContentTypeId`, which is used to signal to the Client which codec should be used to process the
+content that is being sent or received. See [XIP-5](https://github.com/xmtp/XIPs/blob/main/XIPs/xip-5-message-content-types.md)
 for more details on codecs and content types.
 
-Codecs and content types may be proposed as interoperable standards through [XRCs](https://github.com/xmtp/XIPs/blob/main/XIPs/xip-9-composite-content-type.md). 
-If there is a concern that the recipient may not be able to handle a non-standard content type, 
-the sender can use the contentFallback option to provide a string that describes the content being 
+Codecs and content types may be proposed as interoperable standards through [XRCs](https://github.com/xmtp/XIPs/blob/main/XIPs/xip-9-composite-content-type.md).
+If there is a concern that the recipient may not be able to handle a non-standard content type,
+the sender can use the contentFallback option to provide a string that describes the content being
 sent. If the recipient fails to decode the original content, the fallback will replace it and can be
 used to inform the recipient what the original content was.
 
@@ -281,13 +280,13 @@ Bug reports, feature requests, and PRs are welcome in accordance with these [con
 XMTP provides both `production` and `dev` network environments to support the development phases of your project.
 
 The `production` and `dev` networks are completely separate and not interchangeable.
-For example, for a given blockchain account, its XMTP identity on `dev` network is completely 
-distinct from its XMTP identity on the `production` network, as are the messages associated with 
+For example, for a given blockchain account, its XMTP identity on `dev` network is completely
+distinct from its XMTP identity on the `production` network, as are the messages associated with
 these identities. In addition, XMTP identities and messages created on the `dev` network can't be
 accessed from or moved to the `production` network, and vice versa.
 
-**Important:** When you [create a client](#create-a-client), it connects to an XMTP `local` 
-environment by default. When you create the `Api` used by the `Client` it must have a valid network `host`. 
+**Important:** When you [create a client](#create-a-client), it connects to an XMTP `local`
+environment by default. When you create the `Api` used by the `Client`, it must have a valid network `host`.
 
 Here are some best practices for when to use each environment:
 
@@ -297,6 +296,6 @@ Here are some best practices for when to use each environment:
 
 - `local` (`host: "127.0.0.1"`, default): Use to have a client communicate with an XMTP node you are running locally. For example, an XMTP node developer can use `local` to generate client traffic to test a node running locally.
 
-The `production` network is configured to store messages indefinitely. 
-XMTP may occasionally delete messages and keys from the `dev` network, and will provide 
+The `production` network is configured to store messages indefinitely.
+XMTP may occasionally delete messages and keys from the `dev` network, and will provide
 advance notice in the [XMTP Discord community](https://discord.gg/xmtp).
