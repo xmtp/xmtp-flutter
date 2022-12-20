@@ -9,8 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: dart-lang/setup-dart@v1.3
-      - run: dart pub get
-      - run: dart test
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.3.7'
+          channel: 'stable'
+      - run: docker-compose -p xmtp -f "tool/local-node/docker-compose.yml" up -d
+      - run: flutter pub get
+      - run: flutter test --dart-define=TEST_SERVER_ENABLED=true
+      - run: docker-compose -p xmtp -f "tool/local-node/docker-compose.yml" down
+        if: always()
       - run: dart pub publish --dry-run
       # TODO: drop "--dry-run" to auto-publish to pub.dev
