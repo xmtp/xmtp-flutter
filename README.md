@@ -15,12 +15,6 @@ Software in this status:
 - May not be backward compatible
 - Has not undergone a formal security audit
 
-Specifically, this SDK is missing this functionality:
-
-- ***dan provide this***
-- first thing
-- second thing
-
 Follow along in the [tracking issue](https://github.com/xmtp/xmtp-flutter/issues/4) for updates.
 
 To learn more about XMTP and get answers to frequently asked questions, see [FAQ about XMTP](https://xmtp.org/docs/dev-concepts/faq).
@@ -37,20 +31,24 @@ See [xmtp library](https://pub.dev/documentation/xmtp/latest/xmtp/Client-class.h
 
 ## Install with Dart Package Manager
 
-***dan provide this. See xmtp-ios for example content: https://github.com/xmtp/xmtp-ios#install-with-swift-package-manager***
-
-```dart
-code sample
+```bash
+flutter pub add xmtp
 ```
+
+To see more options, check out the [verified XMTP Dart package](https://pub.dev/packages/xmtp/install).
 
 ## Usage overview
 
 The XMTP message API revolves around a message API client (client) that allows retrieving and sending messages to other XMTP network participants. A client must connect to a wallet app on startup. If this is the very first time the client is created, the client will generate a key bundle that is used to encrypt and authenticate messages. The key bundle persists encrypted in the network using an account signature. The public side of the key bundle is also regularly advertised on the network to allow parties to establish shared encryption keys. All of this happens transparently, without requiring any additional code.
 
-***dan provide this. See xmtp-ios for example content: https://github.com/xmtp/xmtp-ios#usage-overview***
-
 ```dart
-code sample
+import 'package:xmtp/xmtp.dart' as xmtp;
+import 'package:web3dart/credentials.dart';
+import 'dart:math';
+
+var wallet = EthPrivateKey.createRandom(Random.secure());
+var api = xmtp.Api.create();
+var client = await xmtp.Client.createFromWallet(api, wallet);
 ```
 
 ## Create a client
