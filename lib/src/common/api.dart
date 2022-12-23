@@ -15,9 +15,9 @@ class Api {
   Api._(this.client, this._metadata);
 
   factory Api.create({
-    String host = '127.0.0.1',
+    String host = 'dev.xmtp.network',
     int port = 5556,
-    bool isSecure = false,
+    bool isSecure = true,
     bool debugLogRequests = kDebugMode,
     String appVersion = "dev/0.0.0-development",
   }) {
