@@ -7,6 +7,27 @@ import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import './crypto.dart';
 
+/// Abstraction over a wallet with an [address] that can [signPersonalMessage]s.
+///
+/// This is used by the [Client] to prompt the user to sign messages.
+///
+/// The goal with this abstraction is to expose a minimal interface so that
+/// integrations can provide their own [Signer] as necessary.
+class Signer {
+  final EthereumAddress address;
+  final Future<Uint8List> Function(String text) signPersonalMessage;
+
+  Signer.create(String address, this.signPersonalMessage)
+      : address = EthereumAddress.fromHex(address);
+}
+
+/// This adds a helper to [Credentials] to treat it as a [Signer].
+extension CredentialsToSigner on Credentials {
+  Future<Signer> asSigner() async => Signer.create(
+      (await extractAddress()).hexEip55,
+      (text) => signPersonalMessage(Uint8List.fromList(utf8.encode(text))));
+}
+
 /// This contains the XMTP signature texts and related utilities.
 
 /// These are the text and bytes that are signed to verify account ownership.

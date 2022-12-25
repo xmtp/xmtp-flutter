@@ -1,28 +1,59 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:quiver/check.dart';
 import 'package:retry/retry.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:xmtp/xmtp.dart' as xmtp;
 
 import 'database/database.dart';
 
 /// The ambient [Session] that is used throughout the app.
-/// See [initSession] and usage throughout `hooks.dart`.
-late Session session;
+/// See [loadSavedSession], [saveSession] and usage throughout `hooks.dart`.
+final Session session = Session();
 
 /// Initialize the ambient [session] for use throughout the app.
 ///
 /// This creates an [xmtp.Client] connected to the local network.
 /// TODO: demo more configuration here
-Future<Session> initSession(Credentials wallet) async {
-  var api = xmtp.Api.create();
-  var client = await xmtp.Client.createFromWallet(api, wallet);
-  var database = Database.create(client);
-  await database.clear();
-  debugPrint("Client initialized: ${wallet.address.hexEip55}");
-  return session = Session(client, database);
+Future<bool> loadSavedSession() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  var prefs = await SharedPreferences.getInstance();
+  if (!prefs.containsKey('xmtp.keys')) {
+    debugPrint("No saved keys");
+    return false;
+  }
+  debugPrint("Found saved keys");
+  var keys = xmtp.PrivateKeyBundle.fromJson(prefs.getString('xmtp.keys')!);
+  var api = xmtp.Api.create(host: 'dev.xmtp.network', isSecure: true);
+  var client = await xmtp.Client.createFromKeys(api, keys);
+  session.init(client);
+  debugPrint("Existing Client initialized: ${client.address.hexEip55}");
+  return true;
+}
+
+Future<void> clearSession() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  var prefs = await SharedPreferences.getInstance();
+  await prefs.remove('xmtp.keys');
+  await session.reset();
+}
+
+Future<bool> initNewSession(xmtp.Signer wallet) async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    var prefs = await SharedPreferences.getInstance();
+    var api = xmtp.Api.create(host: 'dev.xmtp.network', isSecure: true);
+    var client = await xmtp.Client.createFromWallet(api, wallet);
+    await prefs.setString("xmtp.keys", client.keys.writeToJson());
+    session.init(client);
+    debugPrint("New Client initialized: ${client.address.hexEip55}");
+    return true;
+  } catch (err) {
+    return false;
+  }
 }
 
 /// Manages conversations and messages with streaming updates.
@@ -33,9 +64,10 @@ Future<Session> initSession(Credentials wallet) async {
 ///
 /// When listeners are added to the streams, the [Session] will start
 /// streaming the corresponding data from the remote network.
-class Session {
-  final xmtp.Client _client;
-  final Database _db;
+class Session extends ChangeNotifier {
+  bool initialized = false;
+  late xmtp.Client _client;
+  late Database _db;
 
   /// Streams from our local database.
   ///
@@ -65,13 +97,29 @@ class Session {
   /// Manages recovery attempts for remote streams that fail.
   final _Recovery _recovery = _Recovery();
 
-  Session(this._client, this._db) {
+  void init(xmtp.Client client) {
+    checkState(!initialized, message: "Session already initialized");
+    _client = client;
+    _db = Database.create(client);
     _dbStreamConversations = StreamController.broadcast(
       onListen: _onListenConversations,
       onCancel: _onCancelConversations,
     )..addStream(_db.selectConversations().watch());
     _dbStreamConversationByTopic = {};
     _dbStreamMessagesByTopic = {};
+    initialized = true;
+    notifyListeners();
+  }
+
+  Future<void> reset() async {
+    await _apiStreamConversations?.cancel();
+    await Future.wait(_apiStreamMessagesByTopic.values.map((s) => s.cancel()));
+    _apiStreamMessagesByTopic.clear();
+    _recovery.reset();
+    await _db.clear();
+    await _client.terminate();
+    initialized = false;
+    notifyListeners();
   }
 
   EthereumAddress get me => _client.address;
@@ -255,6 +303,15 @@ class _Recovery {
 
   /// Cancel the named recovery attempt.
   void cancel(String name) => _attempts.remove(name)?.cancel();
+
+  /// Reset the recovery system.
+  void reset() {
+    for (var timer in _attempts.values) {
+      timer.cancel();
+    }
+    _attempts.clear();
+    _recentStack.clear();
+  }
 
   /// Add to the number of recent attempts and return the current count.
   ///

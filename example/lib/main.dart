@@ -1,19 +1,14 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:web3dart/credentials.dart';
 
 import 'router.dart';
 import 'session.dart';
 
 void main() async {
-  // A real app would use an elsewhere connected account.
-  // For this demo, we just generate a random wallet on launch.
-  var wallet = EthPrivateKey.createRandom(Random.secure());
-  await initSession(wallet);
-
+  /// If they have saved credentials, initialize the session.
+  /// If not they will be sent to the login page instead.
+  await loadSavedSession();
   _monitorTotalUnreadBadge();
   runApp(const XmtpApp());
 }
@@ -33,6 +28,9 @@ class XmtpApp extends HookWidget {
 
 /// Update the app badge when the number of unread messages changes.
 void _monitorTotalUnreadBadge() {
+  if (!session.initialized) {
+    return;
+  }
   session.watchTotalNewMessageCount().listen((count) {
     if (count > 0) {
       FlutterAppBadger.updateBadgeCount(count);

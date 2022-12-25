@@ -6,6 +6,7 @@ import 'package:web3dart/web3dart.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
+import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp/src/auth.dart';
 import 'package:xmtp/src/contact.dart';
 import 'package:xmtp/src/content/codec_registry.dart';
@@ -21,8 +22,10 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "v2 messaging: invites, reading, writing, streaming",
     () async {
-      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
-      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
       var aliceAddress = aliceWallet.address.hex;
@@ -96,7 +99,8 @@ void main() {
         isSecure: true,
         debugLogRequests: true,
       );
-      var wallet = EthPrivateKey.fromHex("... private key ...");
+      var wallet =
+          await EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(wallet.address, api);
       var codecs = CodecRegistry()..registerCodec(TextCodec());
       var contacts = ContactManager(api);
@@ -123,7 +127,7 @@ void main() {
 
 // helpers
 
-Future<ConversationManagerV2> _createLocalManager(EthPrivateKey wallet) async {
+Future<ConversationManagerV2> _createLocalManager(Signer wallet) async {
   var api = createTestServerApi();
   var auth = AuthManager(wallet.address, api);
   var codecs = CodecRegistry()..registerCodec(TextCodec());

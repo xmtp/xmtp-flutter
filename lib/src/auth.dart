@@ -39,17 +39,21 @@ class AuthManager {
   /// and asks the [wallet] to both [createIdentity] and [enableIdentitySaving]
   /// so we can then store it encrypted for the next time.
   Future<xmtp.PrivateKeyBundle> authenticateWithCredentials(
-    Credentials wallet,
+    Signer wallet,
   ) async {
+    debugPrint('AuthManager.authenticateWithCredentials()');
     xmtp.PrivateKeyBundle keys;
     var storedKeys = await _lookupPrivateKeys();
+    debugPrint('AuthManager storedKeys $storedKeys');
     if (storedKeys.isNotEmpty) {
+      debugPrint("prompting to enable existing identity");
       keys = await wallet.enableIdentityLoading(storedKeys.first);
       _checkKeys(keys);
       var authToken = await keys.createAuthToken();
       _api.setAuthToken(authToken);
       return this.keys = keys;
     } else {
+      debugPrint("prompting to create new identity");
       var identity = generateKeyPair();
       keys = await wallet.createIdentity(identity);
       _checkKeys(keys);
@@ -85,9 +89,16 @@ class AuthManager {
       contentTopics: [Topic.userPrivateStoreKeyBundle(_address.hex)],
       pagingInfo: xmtp.PagingInfo(limit: 10),
     ));
-    return stored.envelopes
-        .map((e) => xmtp.EncryptedPrivateKeyBundle.fromBuffer(e.message))
-        .toList();
+    debugPrint("stored keys: ${stored.envelopes.length}");
+    var result = <xmtp.EncryptedPrivateKeyBundle>[];
+    for (var e in stored.envelopes) {
+      try {
+        result.add(xmtp.EncryptedPrivateKeyBundle.fromBuffer(e.message));
+      } catch (e) {
+        debugPrint("failed to decode stored keys: $e");
+      }
+    }
+    return result;
   }
 
   Future<xmtp.PublishResponse> _savePrivateKeys(
@@ -105,7 +116,7 @@ class AuthManager {
 
 /// This adds some helper methods to [Credentials] (i.e. a signer)
 /// to allow it to create and enable XMTP identities.
-extension AuthCredentials on Credentials {
+extension AuthCredentials on Signer {
   /// This prompts the wallet to sign a personal message.
   /// It authorizes the `identity` key to act on behalf of this wallet.
   ///   e.g. "XMTP : Create Identity ..."
@@ -189,7 +200,7 @@ extension AuthCredentials on Credentials {
   }
 
   Future<Uint8List> _signPersonalMessageText(String text) {
-    return signPersonalMessage(Uint8List.fromList(utf8.encode(text)));
+    return signPersonalMessage(text);
   }
 }
 

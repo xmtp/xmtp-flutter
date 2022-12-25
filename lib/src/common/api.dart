@@ -10,9 +10,10 @@ const clientVersion = "xmtp-flutter/$sdkVersion";
 /// metadata helpers (e.g. for setting the authorization token).
 class Api {
   final xmtp.MessageApiClient client;
+  final grpc.ClientChannel _channel;
   final _MetadataManager _metadata;
 
-  Api._(this.client, this._metadata);
+  Api._(this._channel, this.client, this._metadata);
 
   factory Api.create({
     String host = '127.0.0.1',
@@ -60,7 +61,7 @@ class Api {
       interceptors: interceptors,
     );
     metadata.appVersion = appVersion;
-    return Api._(client, metadata);
+    return Api._(channel, client, metadata);
   }
 
   void clearAuthToken() {
@@ -69,6 +70,10 @@ class Api {
 
   void setAuthToken(String authToken) {
     _metadata.authToken = authToken;
+  }
+
+  Future<void> terminate() async {
+    return _channel.terminate();
   }
 }
 

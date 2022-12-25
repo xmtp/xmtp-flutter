@@ -1,8 +1,9 @@
 import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
-import 'common/api.dart';
 import 'auth.dart';
+import 'common/api.dart';
+import 'common/signature.dart';
 import 'contact.dart';
 import 'content/codec.dart';
 import 'content/codec_registry.dart';
@@ -63,6 +64,7 @@ class Client implements Codec<DecodedContent> {
 
   xmtp.PrivateKeyBundle get keys => _auth.keys;
 
+  final Api _api;
   final ConversationManager _conversations;
   final AuthManager _auth;
   final ContactManager _contacts;
@@ -70,21 +72,21 @@ class Client implements Codec<DecodedContent> {
 
   Client._(
     this.address,
+    this._api,
     this._conversations,
     this._auth,
     this._contacts,
     this._codecs,
   );
 
-  /// This creates a new [Client] instance using the [wallet] to
+  /// This creates a new [Client] instance using the [Signer] to
   /// trigger signature prompts to acquire user authentication keys.
   static Future<Client> createFromWallet(
     Api api,
-    Credentials wallet, {
+    Signer wallet, {
     List<Codec> customCodecs = const [],
   }) async {
-    var address = await wallet.extractAddress();
-    var client = await _createUninitialized(api, address, customCodecs);
+    var client = await _createUninitialized(api, wallet.address, customCodecs);
     await client._auth.authenticateWithCredentials(wallet);
     await client._contacts.ensureSavedContact(client._auth.keys);
     return client;
@@ -125,11 +127,20 @@ class Client implements Codec<DecodedContent> {
     var conversations = ConversationManager(contacts, v1, v2);
     return Client._(
       address,
+      api,
       conversations,
       auth,
       contacts,
       codecs,
     );
+  }
+
+  /// Terminate this client.
+  ///
+  /// Already in progress calls will be terminated. No further calls can be made
+  /// using this client.
+  Future<void> terminate() async {
+    return _api.terminate();
   }
 
   /// This lists all the [Conversation]s for the user.

@@ -3,6 +3,7 @@
 library xmtp;
 
 export 'src/common/api.dart' show Api;
+export 'src/common/signature.dart' show Signer, CredentialsToSigner;
 export 'src/client.dart' show Client;
 export 'src/conversation/conversation.dart' show Conversation;
 export 'src/content/decoded.dart' show DecodedContent, DecodedMessage;
