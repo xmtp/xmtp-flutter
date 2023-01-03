@@ -84,6 +84,43 @@ void main() {
     },
   );
 
+  // This verifies client usage of published contacts.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "contacts: can message only when their contact has been published",
+    () async {
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceAddress = aliceWallet.address.hex;
+      var bobAddress = bobWallet.address.hex;
+      // At this point, neither Alice nor Bob has signed up yet.
+
+      // First Alice signs up.
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+
+      // But Bob hasn't signed up yet, so she cannot message him.
+      expect(await alice.canMessage(bobAddress), false);
+
+      // Then Bob signs up.
+      var bobApi = createTestServerApi();
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+      // Give contacts a moment to propagate.
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // So now they both should be able to message each other
+      expect(await alice.canMessage(bobAddress), true);
+      expect(await bob.canMessage(aliceAddress), true);
+
+      // And they should both remain unable to message a random address.
+      var unknown = EthPrivateKey.createRandom(Random.secure());
+      expect(await alice.canMessage(unknown.address.hex), false);
+      expect(await bob.canMessage(unknown.address.hex), false);
+    },
+  );
+
   // This lists conversations and messages using various listing options.
   test(
     skip: skipUnlessTestServerEnabled,
