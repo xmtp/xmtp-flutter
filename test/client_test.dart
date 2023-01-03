@@ -27,6 +27,7 @@ void main() {
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
+      await _delayToPropagate();
       var aliceAddress = aliceWallet.address.hex;
       var bobAddress = bobWallet.address.hex;
 
@@ -52,6 +53,7 @@ void main() {
 
       // Alice sends the first message.
       await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
+      await _delayToPropagate();
 
       // It gets added to both of their conversation lists with that first msg.
       expect((await alice.listConversations()).length, 1);
@@ -65,6 +67,7 @@ void main() {
 
       // Bob replies
       await bob.sendMessage(bobConvo, "oh, hello Alice!");
+      await _delayToPropagate();
 
       aliceMessages = await alice.listMessages(aliceConvo);
       expect(aliceMessages.length, 2);
@@ -94,18 +97,16 @@ void main() {
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
-
-      // Give contacts a moment to propagate.
-      await Future.delayed(const Duration(milliseconds: 100));
+      await _delayToPropagate();
 
       var convo = await alice.newConversation(bob.address.hex,
           conversationId: "example.com");
       await alice.sendMessage(convo, "first message to convo");
-      await Future.delayed(const Duration(milliseconds: 100));
+      await _delayToPropagate();
       await alice.sendMessage(convo, "second message to convo");
-      await Future.delayed(const Duration(milliseconds: 100));
+      await _delayToPropagate();
       await alice.sendMessage(convo, "third message to convo");
-      await Future.delayed(const Duration(milliseconds: 100));
+      await _delayToPropagate();
 
       var messages = await alice.listMessages(
         convo,
@@ -140,9 +141,7 @@ void main() {
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
-
-      // Give contacts a moment to propagate.
-      await Future.delayed(const Duration(milliseconds: 100));
+      await _delayToPropagate();
 
       var work = await alice.newConversation(
         bob.address.hex,
@@ -158,6 +157,7 @@ void main() {
       await alice.sendMessage(play, "Bob, let's chat here about play.");
       await alice.sendMessage(play, "I don't want to work.");
       await alice.sendMessage(play, "I just want to bang on my drum all day.");
+      await _delayToPropagate();
 
       var bobChats = await bob.listConversations();
       expect(bobChats.length, 2);
@@ -194,11 +194,14 @@ void main() {
         bobWallet,
         customCodecs: [IntegerCodec()],
       );
+      await _delayToPropagate();
 
       var convo = await alice.newConversation(bob.address.hex);
 
+
       await alice.sendMessage(convo, "Here's a number:");
       await alice.sendMessage(convo, 12345, contentType: contentTypeInteger);
+      await _delayToPropagate();
 
       expect((await bob.listMessages(convo)).map((m) => m.content).toList(), [
         12345,
@@ -207,6 +210,7 @@ void main() {
 
       await bob.sendMessage(convo, "Cool. Here's another:");
       await bob.sendMessage(convo, 67890, contentType: contentTypeInteger);
+      await _delayToPropagate();
 
       expect((await alice.listMessages(convo)).map((m) => m.content).toList(), [
         67890,
@@ -241,6 +245,9 @@ void main() {
     },
   );
 }
+
+/// A delay to allow messages to propagate before making assertions.
+_delayToPropagate() => Future.delayed(const Duration(milliseconds: 200));
 
 /// Simple [Codec] for sending [int] values around.
 ///
