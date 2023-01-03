@@ -14,7 +14,7 @@ import 'test_server.dart';
 
 void main() {
   test('creating authToken', () async {
-    var alice = EthPrivateKey.createRandom(Random.secure());
+    var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
     var identity = EthPrivateKey.createRandom(Random.secure());
 
     // Prompt them to sign "XMTP : Create Identity ..."
@@ -39,7 +39,7 @@ void main() {
   });
 
   test('enabling saving and loading of stored keys', () async {
-    var alice = EthPrivateKey.createRandom(Random.secure());
+    var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
     var identity = EthPrivateKey.createRandom(Random.secure());
 
     // Prompt them to sign "XMTP : Create Identity ..."
@@ -68,7 +68,7 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "storing private keys",
     () async {
-      var alice = EthPrivateKey.createRandom(Random.secure());
+      var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
 
       // At first, alice authenticates and saves her keys to the network.
       var apiFirst = createTestServerApi();
@@ -99,7 +99,7 @@ void main() {
         port: 5556,
         isSecure: true,
       );
-      var alice = EthPrivateKey.fromHex("... private key ...");
+      var alice = await EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(alice.address, api);
       var decrypted = await auth.authenticateWithCredentials(alice);
       debugPrint("decrypted $decrypted");

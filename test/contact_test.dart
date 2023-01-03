@@ -148,7 +148,7 @@ void main() {
       // Setup the API client.
       var api = createTestServerApi();
       var contacts = ContactManager(api);
-      var alice = EthPrivateKey.createRandom(Random.secure());
+      var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
 
       // First lookup if she has a contact (i.e. if she has an account)
       var stored = await contacts.getUserContacts(alice.address.hexEip55);

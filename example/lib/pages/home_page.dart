@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../components/address_avatar.dart';
 import '../components/address_chip.dart';
 import '../hooks.dart';
+import '../session.dart';
 
 /// A page showing the list of all conversations for the user.
 ///
@@ -18,10 +19,16 @@ class HomePage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    var me = useMe();
     var conversations = useConversationList();
     var refresher = useConversationsRefresher();
     return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(title: AddressChip(address: me), actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => clearSession(),
+          ),
+        ]),
         body: RefreshIndicator(
           onRefresh: refresher,
           child: ListView.builder(

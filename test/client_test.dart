@@ -6,6 +6,7 @@ import 'package:web3dart/web3dart.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
+import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp/src/content/codec.dart';
 import 'package:xmtp/src/client.dart';
 
@@ -18,9 +19,11 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: listing, reading, writing, streaming",
     () async {
-      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -83,9 +86,11 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "listing and sorting parameters",
     () async {
-      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -127,9 +132,11 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: distinguish conversations using conversationId",
     () async {
-      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -171,9 +178,11 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "codecs: using a custom codec for integers",
     () async {
-      var aliceWallet = EthPrivateKey.createRandom(Random.secure());
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet = EthPrivateKey.createRandom(Random.secure());
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(
         aliceApi,
@@ -217,7 +226,8 @@ void main() {
       // Setup the API client.
       var api =
           Api.create(host: 'dev.xmtp.network', port: 5556, isSecure: true);
-      var wallet = EthPrivateKey.fromHex("... private key ...");
+      var wallet =
+          await EthPrivateKey.fromHex("... private key ...").asSigner();
       var client = await Client.createFromWallet(api, wallet);
       var conversations = await client.listConversations();
       for (var convo in conversations) {
