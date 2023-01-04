@@ -188,6 +188,11 @@ class Client implements Codec<DecodedContent> {
   }) =>
       _conversations.newConversation(address, conversationId, metadata);
 
+  /// Whether or not we can send messages to [address].
+  ///
+  /// This will return false when [address] has never signed up for XMTP.
+  Future<bool> canMessage(String address) => _contacts.hasUserContacts(address);
+
   /// This lists messages sent to the [conversation].
   ///
   /// If [start] or [end] are specified then this will only list messages

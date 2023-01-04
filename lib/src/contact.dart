@@ -27,8 +27,9 @@ class ContactManager {
     String walletAddress,
   ) async {
     walletAddress = EthereumAddress.fromHex(walletAddress).hexEip55;
-    if (_contacts.containsKey(walletAddress)) {
-      return _contacts[walletAddress].toList();
+    var cached = _contacts[walletAddress].toList();
+    if (cached.isNotEmpty) {
+      return cached;
     }
     var stored = await _api.client.query(xmtp.QueryRequest(
       contentTopics: [Topic.userContact(walletAddress)],
@@ -41,6 +42,11 @@ class ContactManager {
     _contacts.removeAll(walletAddress);
     _contacts.addValues(walletAddress, results);
     return results.toList();
+  }
+
+  Future<bool> hasUserContacts(String walletAddress) async {
+    var results = await getUserContacts(walletAddress);
+    return results.isNotEmpty;
   }
 
   Future<xmtp.ContactBundle> getUserContactV1(String walletAddress) async {
