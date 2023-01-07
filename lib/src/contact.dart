@@ -188,13 +188,24 @@ extension CompatContactBundle on xmtp.ContactBundle {
   }
 }
 
-xmtp.PublicKey _toPublicKey(xmtp.SignedPublicKey v2) =>
+xmtp.PublicKey _toPublicKey(
+  xmtp.SignedPublicKey v2, {
+  required bool isSignedByWallet,
+}) =>
     // This works because v1 `PublicKey` ~= v2 `UnsignedPublicKey`
-    xmtp.PublicKey.fromBuffer(v2.keyBytes)..signature = v2.signature;
+    xmtp.PublicKey.fromBuffer(v2.keyBytes)
+      ..signature = isSignedByWallet
+          ? v2.signature.toWalletEcdsa()
+          : v2.signature.toEcdsa();
 
-xmtp.SignedPublicKey _toSignedPublicKey(xmtp.PublicKey v1) =>
+xmtp.SignedPublicKey _toSignedPublicKey(
+  xmtp.PublicKey v1, {
+  required bool isSignedByWallet,
+}) =>
     xmtp.SignedPublicKey(
-      signature: v1.signature,
+      signature: isSignedByWallet
+          ? v1.signature.toWalletEcdsa()
+          : v1.signature.toEcdsa(),
       // This works because v1 `PublicKey` ~= v2 `UnsignedPublicKey`
       keyBytes: xmtp.PublicKey(
         timestamp: v1.timestamp,
@@ -209,22 +220,34 @@ xmtp.ContactBundle createContactBundleV1(xmtp.PrivateKeyBundle keys) {
 
   var identityKey = isAlreadyV1
       ? keys.v1.identityKey.publicKey
-      : _toPublicKey(keys.v2.identityKey.publicKey);
+      : _toPublicKey(keys.v2.identityKey.publicKey, isSignedByWallet: true);
   return xmtp.ContactBundle(
     v1: xmtp.ContactBundleV1(
       keyBundle: xmtp.PublicKeyBundle(
         identityKey: xmtp.PublicKey()
           ..mergeFromMessage(identityKey)
-          ..signature = identityKey.signature.toEcdsa(),
+          ..signature = identityKey.signature.toWalletEcdsa(),
         preKey: isAlreadyV1
             ? keys.v1.preKeys.first.publicKey
-            : _toPublicKey(keys.v2.preKeys.first.publicKey),
+            : _toPublicKey(
+                keys.v2.preKeys.first.publicKey,
+                isSignedByWallet: false,
+              ),
       ),
     ),
   );
 }
 
 /// This creates a [v2] [xmtp.ContactBundle] from a [xmtp.PrivateKeyBundle].
+///
+/// Contact Bundle Signature Notes:
+///
+/// The backend and xmtp-js disagree on how to sign an `.identityKey`:
+///  - the `xmtp-js` library expects a `.walletEcdsaCompact` signature
+///  - the backend expects an `.ecdsaCompact` signature
+/// So we sign these contact bundles (for xmtp-js etc) with `.walletEcdsaCompact`.
+/// And we create authTokens (for the backend) signed `.ecdsaCompact`.
+///  See `createAuthToken()` in `auth.dart`.
 xmtp.ContactBundle createContactBundleV2(xmtp.PrivateKeyBundle keys) {
   var isAlreadyV2 = keys.whichVersion() == xmtp.PrivateKeyBundle_Version.v2;
   return xmtp.ContactBundle(
@@ -232,10 +255,16 @@ xmtp.ContactBundle createContactBundleV2(xmtp.PrivateKeyBundle keys) {
       keyBundle: xmtp.SignedPublicKeyBundle(
         identityKey: isAlreadyV2
             ? keys.v2.identityKey.publicKey
-            : _toSignedPublicKey(keys.v1.identityKey.publicKey),
+            : _toSignedPublicKey(
+                keys.v1.identityKey.publicKey,
+                isSignedByWallet: true,
+              ),
         preKey: isAlreadyV2
             ? keys.v2.preKeys.first.publicKey
-            : _toSignedPublicKey(keys.v1.preKeys.first.publicKey),
+            : _toSignedPublicKey(
+                keys.v1.preKeys.first.publicKey,
+                isSignedByWallet: false,
+              ),
       ),
     ),
   );
