@@ -235,7 +235,6 @@ void main() {
 
       var convo = await alice.newConversation(bob.address.hex);
 
-
       await alice.sendMessage(convo, "Here's a number:");
       await alice.sendMessage(convo, 12345, contentType: contentTypeInteger);
       await _delayToPropagate();

@@ -341,6 +341,15 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
   /// This is used for authentication with the API.
   ///  e.g. it is sent as the "authorization: Bearer $authToken".
   ///
+  /// Auth Token Signature Notes:
+  ///
+  /// The backend and xmtp-js disagree on how to sign an `.identityKey`:
+  ///  - the backend expects an `.ecdsaCompact` signature
+  ///  - the `xmtp-js` library expects a `.walletEcdsaCompact` signature
+  /// So we create this authToken (for the backend) signed `.ecdsaCompact`.
+  /// And we sign contact bundles (for xmtp-js etc) with `.walletEcdsaCompact`.
+  ///  See `createContactBundleV*()` in `contact.dart`.
+  ///
   /// NOTE: this can only be called on v1 bundles.
   /// TODO: consider supporting V2 key bundles
   Future<String> createAuthToken() async {

@@ -169,8 +169,16 @@ void main() {
       var storedV2 = await contacts.getUserContactV2(alice.address.hexEip55);
       expect(storedV1.wallet, alice.address);
       expect(storedV1.whichVersion(), xmtp.ContactBundle_Version.v1);
+      expect(storedV1.v1.keyBundle.identityKey.signature.whichUnion(),
+          xmtp.Signature_Union.walletEcdsaCompact);
+      expect(storedV1.v1.keyBundle.preKey.signature.whichUnion(),
+          xmtp.Signature_Union.ecdsaCompact);
       expect(storedV2.wallet, alice.address);
       expect(storedV2.whichVersion(), xmtp.ContactBundle_Version.v2);
+      expect(storedV2.v2.keyBundle.identityKey.signature.whichUnion(),
+          xmtp.Signature_Union.walletEcdsaCompact);
+      expect(storedV2.v2.keyBundle.preKey.signature.whichUnion(),
+          xmtp.Signature_Union.ecdsaCompact);
       // Note: there's a difference here between the contact and auth token.
       //       The go backend expects auth tokens signed with `ecdsaCompact`.
       //       The js-lib expects contacts signed with `walletEcdsaCompact`.
