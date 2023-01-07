@@ -114,7 +114,10 @@ class ConversationManagerV2 {
     var createdAt = header.createdNs.toDateTime();
     var sender = header.sender.wallet;
     var recipient = header.recipient.wallet;
-    var peer = {sender, recipient}.firstWhere((a) => a != _me);
+    var peer = {sender, recipient}.firstWhere(
+      (a) => a != _me,
+      orElse: () => sender,
+    );
     return Conversation.v2(
       invite,
       createdAt,
