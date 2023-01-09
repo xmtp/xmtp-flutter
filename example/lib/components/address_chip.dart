@@ -8,7 +8,6 @@ import '../hooks.dart';
 ///
 /// When the widget is "me" (the session user) then this
 /// [Chip] displays in vibrant color.
-// TODO: use the .addr.reverse ENS name when available.
 class AddressChip extends HookWidget {
   final EthereumAddress? address;
 
@@ -18,14 +17,11 @@ class AddressChip extends HookWidget {
   @override
   Widget build(BuildContext context) {
     var me = useMe();
-    // TODO: use ENS name
+    var name = useAddressName(address);
     return Chip(
       labelStyle: TextStyle(color: address == me ? Colors.deepPurple : null),
       backgroundColor: address == me ? Colors.deepPurple[50] : null,
-      label: Text(_abbreviate(address?.hexEip55 ?? "")),
+      label: Text(name),
     );
   }
-
-  _abbreviate(String hexEip) =>
-      hexEip.isEmpty ? "" : "${hexEip.substring(0, 6)}…${hexEip.substring(38)}";
 }
