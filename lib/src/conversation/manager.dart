@@ -1,4 +1,5 @@
 import 'package:async/async.dart';
+import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import '../contact.dart';
@@ -17,11 +18,12 @@ import 'conversation_v2.dart';
 /// when they could exist across either v1 or v2.
 /// See [newConversation]
 class ConversationManager {
+  final EthereumAddress _me;
   final ContactManager _contacts;
   final ConversationManagerV1 _v1;
   final ConversationManagerV2 _v2;
 
-  ConversationManager(this._contacts, this._v1, this._v2);
+  ConversationManager(this._me, this._contacts, this._v1, this._v2);
 
   /// This creates or resumes a conversation with [address].
   /// This throws if [address] is not on the XMTP network.
@@ -30,6 +32,10 @@ class ConversationManager {
     String conversationId,
     Map<String, String> metadata,
   ) async {
+    if (EthereumAddress.fromHex(address) == _me) {
+      throw ArgumentError.value(address, 'address',
+          'no self-messaging, sender and recipient must be different');
+    }
     var peerContacts = await _contacts.getUserContacts(address);
     if (peerContacts.isEmpty) {
       throw StateError("recipient $address is not on the XMTP network");

@@ -124,7 +124,7 @@ class Client implements Codec<DecodedContent> {
     }
     var v1 = ConversationManagerV1(address, api, auth, codecs, contacts);
     var v2 = ConversationManagerV2(address, api, auth, codecs, contacts);
-    var conversations = ConversationManager(contacts, v1, v2);
+    var conversations = ConversationManager(address, contacts, v1, v2);
     return Client._(
       address,
       api,
@@ -190,8 +190,11 @@ class Client implements Codec<DecodedContent> {
 
   /// Whether or not we can send messages to [address].
   ///
-  /// This will return false when [address] has never signed up for XMTP.
-  Future<bool> canMessage(String address) => _contacts.hasUserContacts(address);
+  /// This will return false when [address] has never signed up for XMTP
+  /// or when the message is addressed to the sender (no self-messaging).
+  Future<bool> canMessage(String address) async =>
+      EthereumAddress.fromHex(address) != this.address &&
+      await _contacts.hasUserContacts(address);
 
   /// This lists messages sent to the [conversation].
   ///
