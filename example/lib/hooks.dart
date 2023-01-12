@@ -1,10 +1,14 @@
 import 'package:async/async.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart' as fh;
+import 'package:quiver/cache.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:xmtp/xmtp.dart' as xmtp;
+import 'package:http/http.dart' as http;
 
+import 'config.dart';
 import 'session.dart';
+import 'ens.dart';
 
 /// Helpful hooks used throughout the app.
 ///
@@ -13,6 +17,29 @@ import 'session.dart';
 
 /// The configured user's address.
 EthereumAddress useMe() => session.me;
+
+var _web3 = Web3Client(ethRpcUrl, http.Client());
+var _addressNames = MapCache<EthereumAddress, String>.lru(maximumSize: 100);
+
+/// This returns a name for the [address].
+/// If there is no ENS name it uses an abbreviation of the [address] hex.
+String useAddressName(EthereumAddress? address) {
+  var hex = address?.hexEip55 ?? "";
+  var abbreviated =
+      hex.isEmpty ? "" : "${hex.substring(0, 6)}…${hex.substring(38)}";
+  var lookup = address == null
+      ? Future.value(null)
+      : _addressNames.get(
+          address,
+          ifAbsent: (address) =>
+              _web3.lookupAddress(address).then((name) => name ?? ""),
+        );
+  var name = fh.useFuture(lookup, initialData: abbreviated);
+  if ((name.data ?? "").isEmpty) {
+    return abbreviated;
+  }
+  return name.data!;
+}
 
 /// The list of all conversations.
 ///
