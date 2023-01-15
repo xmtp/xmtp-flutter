@@ -1,6 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:fixnum/fixnum.dart';
+import 'package:flutter/foundation.dart';
+import 'package:quiver/check.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:web3dart/credentials.dart';
@@ -23,17 +25,20 @@ import 'conversation.dart';
 /// NOTE: it aims to limit exposure of the V2 specific details.
 class ConversationManagerV2 {
   final EthereumAddress _me;
-  final Api _api;
-  final AuthManager _auth;
+  @visibleForTesting
+  final Api api;
+  @visibleForTesting
+  final AuthManager auth;
   final CodecRegistry _codecs;
-  final ContactManager _contacts;
+  @visibleForTesting
+  final ContactManager contacts;
 
   ConversationManagerV2(
     this._me,
-    this._api,
-    this._auth,
+    this.api,
+    this.auth,
     this._codecs,
-    this._contacts,
+    this.contacts,
   );
 
   /// This creates a new conversation with [address] in the specified [context].
@@ -43,15 +48,17 @@ class ConversationManagerV2 {
     xmtp.InvitationV1_Context context,
   ) async {
     var peer = EthereumAddress.fromHex(address);
-    var invite = _createInviteV1(context);
-    var peerContact = await _contacts.getUserContactV2(peer.hex);
-    var sealed = await _encryptInviteV1(
-      _auth.keys,
+    var invite = createInviteV1(context);
+    var peerContact = await contacts.getUserContactV2(peer.hex);
+    var now = nowNs();
+    var sealed = await encryptInviteV1(
+      auth.keys,
       peerContact.v2.keyBundle,
       invite,
+      now,
     );
-    await _sendInvites(peer, sealed);
-    return _conversationFromInvite(sealed);
+    await _sendInvites(peer, sealed, now);
+    return _conversationFromInvite(sealed, now);
   }
 
   /// This returns the latest [Conversation] with [address]
@@ -73,13 +80,15 @@ class ConversationManagerV2 {
   }
 
   /// This returns the list of all invited [Conversation]s.
+  ///
+  /// Note: bad conversation invitation envelopes are discarded.
   Future<List<Conversation>> listConversations([
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
-    var listing = await _api.client.query(xmtp.QueryRequest(
+    var listing = await api.client.query(xmtp.QueryRequest(
       contentTopics: [Topic.userInvite(_me.hex)],
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
@@ -88,29 +97,55 @@ class ConversationManagerV2 {
         direction: sort,
       ),
     ));
-    var conversations = await Future.wait(listing.envelopes
-        .map((e) => xmtp.SealedInvitation.fromBuffer(e.message))
-        .map((sealed) => _conversationFromInvite(sealed)));
-    // Remove duplicates by topic identifier.
+    var conversations = await Future.wait(
+        listing.envelopes.map((e) => _conversationFromEnvelope(e)));
     var unique = <String>{};
-    return conversations.where((c) => unique.add(c.topic)).toList();
+    return conversations
+        // Remove nulls (which are discarded bad envelopes).
+        .where((c) => c != null)
+        .map((c) => c!)
+        // Remove duplicates by topic identifier.
+        .where((c) => unique.add(c.topic))
+        .toList();
   }
 
   /// This exposes a stream of new [Conversation]s.
-  Stream<Conversation> streamConversations() => _api.client
+  ///
+  /// Note: bad conversation invitation envelopes are discarded.
+  Stream<Conversation> streamConversations() => api.client
       .subscribe(xmtp.SubscribeRequest(contentTopics: [
         Topic.userInvite(_me.hex),
       ]))
-      .map((e) => xmtp.SealedInvitation.fromBuffer(e.message))
-      .asyncMap((sealed) => _conversationFromInvite(sealed));
+      .asyncMap((envelope) => _conversationFromEnvelope(envelope))
+      // Remove nulls (which are discarded bad envelopes).
+      .where((convo) => convo != null)
+      .map((convo) => convo!);
+
+  /// This helper adapts an [envelope] (with an invite) into a [Conversation].
+  ///
+  /// It returns `null` when the envelope could not be decoded.
+  Future<Conversation?> _conversationFromEnvelope(xmtp.Envelope e) async {
+    try {
+      var invite = xmtp.SealedInvitation.fromBuffer(e.message);
+      checkState(e.hasMessage(), message: 'missing envelope message');
+      checkState(e.timestampNs > 0, message: 'missing envelope timestamp');
+      return await _conversationFromInvite(invite, e.timestampNs);
+    } catch (e) {
+      debugPrint('discarding bad invite: $e');
+      return null;
+    }
+  }
 
   /// This helper adapts a [sealed] invitation into a [Conversation].
   Future<Conversation> _conversationFromInvite(
     xmtp.SealedInvitation sealed,
+    Int64 expectedTimestampNs,
   ) async {
     var headerBytes = sealed.v1.headerBytes;
     var header = xmtp.SealedInvitationHeaderV1.fromBuffer(headerBytes);
-    var invite = await decryptInviteV1(sealed.v1, _auth.keys);
+    var invite = await decryptInviteV1(sealed.v1, auth.keys);
+    checkState(expectedTimestampNs == header.createdNs,
+        message: 'envelope and header timestamp mismatch');
     var createdAt = header.createdNs.toDateTime();
     var sender = header.sender.wallet;
     var recipient = header.recipient.wallet;
@@ -130,19 +165,20 @@ class ConversationManagerV2 {
     xmtp.ContentTypeId? contentType,
   }) async {
     contentType ??= contentTypeText;
+    var now = nowNs();
     var encoded = await _codecs.encode(DecodedContent(contentType, content));
     var header = xmtp.MessageHeaderV2(
       topic: conversation.topic,
-      createdNs: nowNs(),
+      createdNs: now,
     );
-    var signed = await _signContent(_auth.keys, header, encoded);
-    var encrypted = await _encryptMessageV2(
-        _auth.keys, conversation.invite, header, signed);
+    var signed = await _signContent(auth.keys, header, encoded);
+    var encrypted =
+        await _encryptMessageV2(auth.keys, conversation.invite, header, signed);
     var dm = xmtp.Message(v2: encrypted);
-    await _api.client.publish(xmtp.PublishRequest(envelopes: [
+    await api.client.publish(xmtp.PublishRequest(envelopes: [
       xmtp.Envelope(
         contentTopic: conversation.topic,
-        timestampNs: nowNs(),
+        timestampNs: now,
         message: dm.writeToBuffer(),
       ),
     ]));
@@ -157,7 +193,7 @@ class ConversationManagerV2 {
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
-    var listing = await _api.client.query(xmtp.QueryRequest(
+    var listing = await api.client.query(xmtp.QueryRequest(
       contentTopics: [conversation.topic],
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
@@ -175,7 +211,7 @@ class ConversationManagerV2 {
   Stream<DecodedMessage> streamMessages(
     Conversation conversation,
   ) =>
-      _api.client
+      api.client
           .subscribe(xmtp.SubscribeRequest(contentTopics: [conversation.topic]))
           .map((e) => xmtp.Message.fromBuffer(e.message))
           .asyncMap((msg) => _decodedFromMessage(conversation, msg));
@@ -201,12 +237,13 @@ class ConversationManagerV2 {
   Future<xmtp.PublishResponse> _sendInvites(
     EthereumAddress peer,
     xmtp.SealedInvitation sealed,
+    Int64 timestampNs,
   ) =>
-      _api.client.publish(xmtp.PublishRequest(
+      api.client.publish(xmtp.PublishRequest(
         envelopes: [_me.hex, peer.hex].map(
           (walletAddress) => xmtp.Envelope(
             contentTopic: Topic.userInvite(walletAddress),
-            timestampNs: nowNs(),
+            timestampNs: timestampNs,
             message: sealed.writeToBuffer(),
           ),
         ),
@@ -215,7 +252,8 @@ class ConversationManagerV2 {
 
 /// This uses the provided `context` to create a new conversation invitation.
 /// It randomly generates the topic identifier and encryption key material.
-xmtp.InvitationV1 _createInviteV1(xmtp.InvitationV1_Context context) {
+@visibleForTesting
+xmtp.InvitationV1 createInviteV1(xmtp.InvitationV1_Context context) {
   // The topic is a random string of alphanumerics.
   // This base64 encodes some random bytes and strips non-alphanumerics.
   // Note: we don't rely on this being valid base64 anywhere.
@@ -235,10 +273,12 @@ xmtp.InvitationV1 _createInviteV1(xmtp.InvitationV1_Context context) {
 
 /// This uses `keys` to encrypt the `invite` to `recipient`.
 /// It derives the 3DH secret and uses that to encrypt the ciphertext.
-Future<xmtp.SealedInvitation> _encryptInviteV1(
+@visibleForTesting
+Future<xmtp.SealedInvitation> encryptInviteV1(
   xmtp.PrivateKeyBundle keys,
   xmtp.SignedPublicKeyBundle recipient,
   xmtp.InvitationV1 invite,
+  Int64 createdNs,
 ) async {
   var isRecipientMe = false;
   var secret = compute3DHSecret(
@@ -251,7 +291,7 @@ Future<xmtp.SealedInvitation> _encryptInviteV1(
   var header = xmtp.SealedInvitationHeaderV1(
     sender: createContactBundleV2(keys).v2.keyBundle,
     recipient: recipient,
-    createdNs: nowNs(),
+    createdNs: createdNs,
   );
   var headerBytes = header.writeToBuffer();
   var ciphertext = await encrypt(
