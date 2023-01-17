@@ -42,3 +42,6 @@ Api createTestServerApi() {
     isSecure: testServerIsSecure,
   );
 }
+
+/// A delay to allow messages to propagate before making assertions.
+delayToPropagate() => Future.delayed(const Duration(milliseconds: 200));

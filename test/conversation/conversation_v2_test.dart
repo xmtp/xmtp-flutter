@@ -7,6 +7,8 @@ import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
 import 'package:xmtp/src/common/signature.dart';
+import 'package:xmtp/src/common/time64.dart';
+import 'package:xmtp/src/common/topic.dart';
 import 'package:xmtp/src/auth.dart';
 import 'package:xmtp/src/contact.dart';
 import 'package:xmtp/src/content/codec_registry.dart';
@@ -44,6 +46,7 @@ void main() {
           metadata: {"title": "Alice & Bob"},
         ),
       );
+      await delayToPropagate();
 
       // They both get the invite.
       expect((await alice.listConversations()).length, 1);
@@ -62,6 +65,7 @@ void main() {
 
       // Alice sends the first message.
       await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
+      await delayToPropagate();
 
       // And Bob see the message in the conversation.
       var bobMessages = await bob.listMessages(bobConvo);
@@ -71,6 +75,7 @@ void main() {
 
       // Bob replies
       await bob.sendMessage(bobConvo, "oh, hello Alice!");
+      await delayToPropagate();
 
       var aliceMessages = await alice.listMessages(aliceConvo);
       expect(aliceMessages.length, 2);
@@ -84,6 +89,76 @@ void main() {
         "$aliceAddress> hello Bob, it's me Alice!",
         "$bobAddress> oh, hello Alice!",
       ]);
+    },
+  );
+
+  // This creates 2 users connected to the API and prepares
+  // an invalid invitation (mismatched timestamps)
+  // to verify that it is properly discarded.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "v2 messaging: mismatched timestamps on an invite should be discarded",
+    () async {
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var alice = await _createLocalManager(aliceWallet);
+      var bob = await _createLocalManager(bobWallet);
+      var bobAddress = bobWallet.address.hex;
+
+      var aliceChats = await alice.listConversations();
+      var bobChats = await bob.listConversations();
+      expect(aliceChats.length, 0);
+      expect(bobChats.length, 0);
+
+      // Use low-level API call to pretend Alice sent an invalid invitation.
+      var badInviteSealedAt = nowNs();
+      var badInvitePublishedAt = nowNs() + 12345;
+      // Note: these ^ timestamps do not match which makes the envelope invalid
+      var bobPeer = await alice.contacts.getUserContactV2(bobAddress);
+      var invalidInvite = await encryptInviteV1(
+        alice.auth.keys,
+        bobPeer.v2.keyBundle,
+        createInviteV1(xmtp.InvitationV1_Context(
+          conversationId: "example.com/not-valid-mismatched-timestamps",
+        )),
+        badInviteSealedAt,
+      );
+      await alice.api.client.publish(xmtp.PublishRequest(envelopes: [
+        xmtp.Envelope(
+          contentTopic: Topic.userInvite(bobAddress),
+          timestampNs: badInvitePublishedAt,
+          message: invalidInvite.writeToBuffer(),
+        )
+      ]));
+      await delayToPropagate();
+
+      // Now looking at the low-level invites we see that Bob has received it...
+      var raw = await bob.api.client.query(xmtp.QueryRequest(
+        contentTopics: [Topic.userInvite(bobAddress)],
+      ));
+      expect(
+        xmtp.SealedInvitation.fromBuffer(raw.envelopes[0].message),
+        invalidInvite,
+      );
+      // ... but when Bob lists conversations the invalid one is discarded.
+      expect((await bob.listConversations()).length, 0);
+
+      // But later if Alice sends a _valid_ invite...
+      await alice.newConversation(
+        bobAddress,
+        xmtp.InvitationV1_Context(
+          conversationId: "example.com/valid",
+        ),
+      );
+      await delayToPropagate();
+
+      // ... then Bob should see that new conversation (and still discard the
+      // earlier invalid invitation).
+      expect((await bob.listConversations()).length, 1);
+      var bobConvo = (await bob.listConversations())[0];
+      expect(bobConvo.conversationId, "example.com/valid");
     },
   );
 
@@ -136,7 +211,7 @@ Future<ConversationManagerV2> _createLocalManager(Signer wallet) async {
   var myContacts = await contacts.getUserContacts(wallet.address.hex);
   if (myContacts.isEmpty) {
     await contacts.saveContact(keys);
-    await Future.delayed(const Duration(milliseconds: 100));
+    await delayToPropagate();
   }
   return ConversationManagerV2(
     wallet.address,
