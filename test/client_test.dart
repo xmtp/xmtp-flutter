@@ -178,7 +178,7 @@ void main() {
           await EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
-      await _delayToPropagate();
+      await delayToPropagate();
 
       await expectLater(() async => alice.newConversation(alice.address.hex),
           throwsArgumentError);
