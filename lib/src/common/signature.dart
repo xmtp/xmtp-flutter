@@ -253,6 +253,10 @@ extension EthAddressBytes on List<int> {
       // Skip the uncompressed indicator prefix.
       publicKey = publicKey.sublist(1);
     }
+    if (publicKey.length < 64) {
+      // Pad left to 64 bytes with zero-bytes.
+      publicKey = Uint8List(64)..setRange(64 - publicKey.length, 64, publicKey);
+    }
     if (publicKey.length != 64) {
       throw StateError("bad public key $publicKey");
     }
