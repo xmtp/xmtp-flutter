@@ -41,19 +41,15 @@ class AuthManager {
   Future<xmtp.PrivateKeyBundle> authenticateWithCredentials(
     Signer wallet,
   ) async {
-    debugPrint('AuthManager.authenticateWithCredentials()');
     xmtp.PrivateKeyBundle keys;
     var storedKeys = await _lookupPrivateKeys();
-    debugPrint('AuthManager storedKeys $storedKeys');
     if (storedKeys.isNotEmpty) {
-      debugPrint("prompting to enable existing identity");
       keys = await wallet.enableIdentityLoading(storedKeys.first);
       _checkKeys(keys);
       var authToken = await keys.createAuthToken();
       _api.setAuthToken(authToken);
       return this.keys = keys;
     } else {
-      debugPrint("prompting to create new identity");
       var identity = generateKeyPair();
       keys = await wallet.createIdentity(identity);
       _checkKeys(keys);
@@ -89,7 +85,6 @@ class AuthManager {
       contentTopics: [Topic.userPrivateStoreKeyBundle(_address.hex)],
       pagingInfo: xmtp.PagingInfo(limit: 10),
     ));
-    debugPrint("stored keys: ${stored.envelopes.length}");
     var result = <xmtp.EncryptedPrivateKeyBundle>[];
     for (var e in stored.envelopes) {
       try {
