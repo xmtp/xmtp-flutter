@@ -106,7 +106,10 @@ class ConversationManagerV1 {
     var recipient = header.recipient.identityKey
         .recoverWalletSignerPublicKey()
         .toEthereumAddress();
-    var peer = {sender, recipient}.firstWhere((a) => a != _me);
+    var peer = {sender, recipient}.firstWhere(
+      (a) => a != _me,
+      orElse: () => sender,
+    );
     var topic = Topic.directMessageV1(_me.hex, peer.hex);
     _seenTopics.add(topic);
     return Conversation.v1(createdAt, me: _me, peer: peer);

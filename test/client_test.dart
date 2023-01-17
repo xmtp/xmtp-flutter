@@ -114,6 +114,10 @@ void main() {
       expect(await alice.canMessage(bobAddress), true);
       expect(await bob.canMessage(aliceAddress), true);
 
+      // But they should not be able to message themselves (no self-messaging)
+      expect(await alice.canMessage(aliceAddress), false);
+      expect(await bob.canMessage(bobAddress), false);
+
       // And they should both remain unable to message a random address.
       var unknown = EthPrivateKey.createRandom(Random.secure());
       expect(await alice.canMessage(unknown.address.hex), false);
@@ -162,6 +166,22 @@ void main() {
       expect(messages.length, 2);
       expect(messages[0].content, "third message to convo");
       expect(messages[1].content, "second message to convo");
+    },
+  );
+
+  // This tests a user messaging herself.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "messaging: self messages should be prevented",
+    () async {
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      await _delayToPropagate();
+
+      await expectLater(() async => alice.newConversation(alice.address.hex),
+          throwsArgumentError);
     },
   );
 
