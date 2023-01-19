@@ -24,7 +24,16 @@ class AuthManager {
   final Api _api;
   late xmtp.PrivateKeyBundle keys;
 
-  AuthManager(this._address, this._api);
+  String authToken = "";
+  DateTime authTokenExpiresAt = DateTime(0);
+  final Duration maxAuthTokenAge;
+
+  AuthManager(
+    this._address,
+    this._api, {
+    // Note: true max is 1 hour. But we give ourselves some elbow room.
+    this.maxAuthTokenAge = const Duration(minutes: 59),
+  });
 
   /// This authenticates using [keys] acquired from network storage
   /// encrypted using the [wallet].
@@ -46,19 +55,30 @@ class AuthManager {
     if (storedKeys.isNotEmpty) {
       keys = await wallet.enableIdentityLoading(storedKeys.first);
       _checkKeys(keys);
-      var authToken = await keys.createAuthToken();
-      _api.setAuthToken(authToken);
-      return this.keys = keys;
+      this.keys = keys;
+      _api.setAuthTokenProvider(getAuthToken);
+      return keys;
     } else {
       var identity = generateKeyPair();
       keys = await wallet.createIdentity(identity);
       _checkKeys(keys);
+      this.keys = keys;
+      _api.setAuthTokenProvider(getAuthToken);
       var encryptedKeys = await wallet.enableIdentitySaving(keys);
-      var authToken = await keys.createAuthToken();
-      _api.setAuthToken(authToken);
       await _savePrivateKeys(encryptedKeys);
-      return this.keys = keys;
+      return keys;
     }
+  }
+
+  /// This returns an authentication token for the current user.
+  /// If a previous auth token does not exist, or if it has expired,
+  /// then this will use the [keys] to create a new one.
+  Future<String> getAuthToken() async {
+    if (authToken.isEmpty || authTokenExpiresAt.isBefore(DateTime.now())) {
+      authToken = await keys.createAuthToken();
+      authTokenExpiresAt = DateTime.now().add(maxAuthTokenAge);
+    }
+    return authToken;
   }
 
   /// This authenticates with [keys] directly received.
@@ -68,9 +88,9 @@ class AuthManager {
     xmtp.PrivateKeyBundle keys,
   ) async {
     _checkKeys(keys);
-    var authToken = await keys.createAuthToken();
-    _api.setAuthToken(authToken);
-    return this.keys = keys;
+    this.keys = keys;
+    _api.setAuthTokenProvider(getAuthToken);
+    return keys;
   }
 
   /// This throws if the wallet signer of the keys does not match [address].

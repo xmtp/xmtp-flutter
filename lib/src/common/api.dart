@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:grpc/grpc.dart' as grpc;
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
@@ -64,12 +66,12 @@ class Api {
     return Api._(channel, client, metadata);
   }
 
-  void clearAuthToken() {
-    _metadata.authToken = "";
+  void clearAuthTokenProvider() {
+    _metadata.authTokenProvider = null;
   }
 
-  void setAuthToken(String authToken) {
-    _metadata.authToken = authToken;
+  void setAuthTokenProvider(FutureOr<String> Function() authTokenProvider) {
+    _metadata.authTokenProvider = authTokenProvider;
   }
 
   Future<void> terminate() async {
@@ -79,7 +81,7 @@ class Api {
 
 /// This controls the metadata that is attached to every API request.
 class _MetadataManager {
-  String authToken = "";
+  FutureOr<String> Function()? authTokenProvider;
   String appVersion = "";
 
   /// This adheres to the [grpc.MetadataProvider] interface
@@ -90,6 +92,7 @@ class _MetadataManager {
     if (appVersion.isNotEmpty) {
       metadata['x-app-version'] = appVersion;
     }
+    var authToken = authTokenProvider == null ? "" : await authTokenProvider!();
     if (authToken.isNotEmpty) {
       metadata['authorization'] = 'Bearer $authToken';
     }

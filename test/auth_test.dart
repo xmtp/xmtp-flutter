@@ -87,6 +87,33 @@ void main() {
     },
   );
 
+  // This creates an auth token, waits for it to expire,
+  // then checks that the next request gets a new auth token.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "auto-refreshing expired authTokens",
+    () async {
+      // We use a very short duration here to speed up the test.
+      var maxAge = const Duration(milliseconds: 100);
+      var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var api = createTestServerApi();
+      var auth = AuthManager(alice.address, api, maxAuthTokenAge: maxAge);
+      await auth.authenticateWithCredentials(alice);
+
+      // At first there should be an initial non-empty auth token.
+      var initialAuthToken = await auth.getAuthToken();
+      expect(initialAuthToken, isNotEmpty);
+
+      // Then when we wait long enough for it to expire...
+      await Future.delayed(maxAge * 2);
+
+      // ... we should get a new one for the next request.
+      var laterAuthToken = await auth.getAuthToken();
+      expect(laterAuthToken, isNot(initialAuthToken));
+      expect(laterAuthToken, isNotEmpty);
+    },
+  );
+
   // This connects to the dev network to test loading saved keys.
   // NOTE: it requires a private key
   test(
