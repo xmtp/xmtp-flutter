@@ -162,6 +162,99 @@ void main() {
     },
   );
 
+  // This creates 2 users connected to the API and having a conversation.
+  // It sends a message with invalid payload (bad content signature)
+  // to verify that it is properly discarded.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "v2 messaging: bad signature on a message should be discarded",
+    () async {
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var alice = await _createLocalManager(aliceWallet);
+      var bob = await _createLocalManager(bobWallet);
+      var aliceAddress = aliceWallet.address.hex;
+      var bobAddress = bobWallet.address.hex;
+
+      var aliceChats = await alice.listConversations();
+      var bobChats = await bob.listConversations();
+      expect(aliceChats.length, 0);
+      expect(bobChats.length, 0);
+
+      // First Alice invites Bob to the conversation
+      var aliceConvo = await alice.newConversation(
+        bobAddress,
+        xmtp.InvitationV1_Context(
+          conversationId: "example.com/valid",
+        ),
+      );
+      await delayToPropagate();
+      var bobConvo = (await bob.listConversations())[0];
+      expect(bobConvo.conversationId, "example.com/valid");
+
+      // Helper to inspect transcript (from Alice's perspective).
+      getTranscript() async => (await alice.listMessages(aliceConvo))
+          .reversed
+          .map((msg) => '${msg.sender.hex}> ${msg.content}');
+
+      // There are no messages at first.
+      expect(await getTranscript(), []);
+
+      // But then Alice sends a message to greet Bob.
+      await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
+      await delayToPropagate();
+
+      // That first messages should show up in the transcript.
+      expect(await getTranscript(), [
+        "$aliceAddress> hello Bob, it's me Alice!",
+      ]);
+
+      // And when Bob sends a greeting back...
+      await bob.sendMessage(bobConvo, "Oh, good to chat with you Alice!");
+      await delayToPropagate();
+
+      // ... Bob's message should show up in the transcript too.
+      expect(await getTranscript(), [
+        "$aliceAddress> hello Bob, it's me Alice!",
+        "$bobAddress> Oh, good to chat with you Alice!",
+      ]);
+
+      // But when Bob's payload is tampered with...
+      // (we simulate this using low-level API calls with a bad payload)
+      var original = await TextCodec().encode("I love you!");
+      var tampered = await TextCodec().encode("I hate you!");
+      var now = nowNs();
+      var header = xmtp.MessageHeaderV2(topic: bobConvo.topic, createdNs: now);
+      var signed = await signContent(bob.auth.keys, header, original);
+      // Here's where we pretend to tamper the payload (after signing).
+      signed.payload = tampered.writeToBuffer();
+      var tamperedMessage = await encryptMessageV2(
+          bob.auth.keys, bobConvo.invite, header, signed);
+      await bob.api.client.publish(xmtp.PublishRequest(envelopes: [
+        xmtp.Envelope(
+          contentTopic: bobConvo.topic,
+          timestampNs: now,
+          message: xmtp.Message(v2: tamperedMessage).writeToBuffer(),
+        )
+      ]));
+      await delayToPropagate();
+
+      // ... then Alice can inspect the topic directly to sees the bad message.
+      var inspecting = await alice.api.client
+          .query(xmtp.QueryRequest(contentTopics: [aliceConvo.topic]));
+      expect(inspecting.envelopes.length, 3 /* = 2 valid + 1 bad */);
+
+      // ... but when she lists messages the tampered one is properly discarded.
+      expect(await getTranscript(), [
+        "$aliceAddress> hello Bob, it's me Alice!",
+        "$bobAddress> Oh, good to chat with you Alice!",
+        // The bad 3rd message was discarded.
+      ]);
+    },
+  );
+
   // This connects to the dev network to test decrypting v2 messages
   // NOTE: it requires a private key
   test(
