@@ -174,9 +174,9 @@ class ConversationManagerV2 {
       topic: conversation.topic,
       createdNs: now,
     );
-    var signed = await _signContent(auth.keys, header, encoded);
+    var signed = await signContent(auth.keys, header, encoded);
     var encrypted =
-        await _encryptMessageV2(auth.keys, conversation.invite, header, signed);
+        await encryptMessageV2(auth.keys, conversation.invite, header, signed);
     var dm = xmtp.Message(v2: encrypted);
     await api.client.publish(xmtp.PublishRequest(envelopes: [
       xmtp.Envelope(
@@ -205,9 +205,14 @@ class ConversationManagerV2 {
         direction: sort,
       ),
     ));
-    return Future.wait(listing.envelopes
+    var messages = await Future.wait(listing.envelopes
         .map((e) => xmtp.Message.fromBuffer(e.message))
         .map((msg) => _decodedFromMessage(conversation, msg)));
+    // Remove nulls (which are discarded bad envelopes).
+    return messages
+        .where((msg) => msg != null)
+        .map((msg) => msg!)
+        .toList();
   }
 
   /// This exposes the stream of new messages in the [conversation].
@@ -217,14 +222,31 @@ class ConversationManagerV2 {
       api.client
           .subscribe(xmtp.SubscribeRequest(contentTopics: [conversation.topic]))
           .map((e) => xmtp.Message.fromBuffer(e.message))
-          .asyncMap((msg) => _decodedFromMessage(conversation, msg));
+          .asyncMap((msg) => _decodedFromMessage(conversation, msg))
+          // Remove nulls (which are discarded bad envelopes).
+          .where((msg) => msg != null)
+          .map((msg) => msg!);
 
   /// This decrypts and decodes the [xmtp.Message].
-  Future<DecodedMessage> _decodedFromMessage(
+  ///
+  /// It returns `null` when the message could not be decoded.
+  Future<DecodedMessage?> _decodedFromMessage(
     Conversation conversation,
     xmtp.Message msg,
   ) async {
     var signed = await _decryptMessageV2(msg.v2, conversation.invite);
+
+    // Discard the message if the payload is not properly signed.
+    var digest = await sha256(msg.v2.headerBytes + signed.payload);
+    var signer = ecRecover(
+      Uint8List.fromList(digest),
+      signed.signature.toMsgSignature(),
+    );
+    if (signer.toEthereumAddress() != signed.sender.pre) {
+      debugPrint('discarding message with bad signature');
+      return null;
+    }
+
     var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
     var decoded = await _codecs.decode(encoded);
     return _createDecodedMessage(
@@ -339,7 +361,8 @@ Future<xmtp.InvitationV1> decryptInviteV1(
 
 /// This uses `keys` to sign the `content` and then encrypts it
 /// using the key material from the `invite`.
-Future<xmtp.MessageV2> _encryptMessageV2(
+@visibleForTesting
+Future<xmtp.MessageV2> encryptMessageV2(
   xmtp.PrivateKeyBundle keys,
   xmtp.InvitationV1 invite,
   xmtp.MessageHeaderV2 header,
@@ -374,7 +397,8 @@ Future<xmtp.SignedContent> _decryptMessageV2(
 
 /// This signs the `content` to prove that it was sent
 /// by the `keys` sender to the `header` conversation.
-Future<xmtp.SignedContent> _signContent(
+@visibleForTesting
+Future<xmtp.SignedContent> signContent(
   xmtp.PrivateKeyBundle keys,
   xmtp.MessageHeaderV2 header,
   xmtp.EncodedContent content,
