@@ -1,17 +1,14 @@
 # xmtp-flutter
 
-![Test](https://github.com/xmtp/xmtp-flutter/actions/workflows/test.yml/badge.svg) ![Status](https://img.shields.io/badge/Project_Status-Developer_Preview-yellow)
+![Test](https://github.com/xmtp/xmtp-flutter/actions/workflows/test.yml/badge.svg) ![Status](https://img.shields.io/badge/Project_Status-General_Availability-green)
 
 `xmtp-flutter` provides a Dart implementation of an XMTP message API client for use with Flutter apps.
 
 Use `xmtp-flutter` to build with XMTP to send messages between blockchain accounts, including DMs, notifications, announcements, and more.
 
-This SDK is in **Developer Preview** status and ready for you to start building.
+This SDK is in **General Availability** status and ready for use in production. 
 
-However, we do **not** recommend using Developer Preview software in production apps.
-Software in this status may change based on feedback.
-
-Follow along in the [tracking issue](https://github.com/xmtp/xmtp-flutter/issues/4) for updates.
+To keep up with the latest SDK developments, see the [Issues tab](https://github.com/xmtp/xmtp-flutter/issues) in this repo.
 
 To learn more about XMTP and get answers to frequently asked questions, see [FAQ about XMTP](https://xmtp.org/docs/dev-concepts/faq).
 
@@ -171,8 +168,8 @@ var listening = client.streamMessages(convo).listen((message) {
 await listening.cancel();
 ```
 
-**Note:** This package does not currently include the `streamAllMessages()` functionality from the XMTP
-client SDK for JavaScript (xmtp-js).
+> **Note**  
+> This package does not currently include the `streamAllMessages()` functionality from the [XMTP client SDK for JavaScript](https://github.com/xmtp/xmtp-js) (xmtp-js).
 
 ### Handling multiple conversations with the same blockchain address
 
@@ -258,7 +255,7 @@ This package currently does not support message content compression.
 
 Because `xmtp-flutter` is in active development, you should expect breaking revisions that might require you to adopt the latest SDK release to enable your app to continue working as expected.
 
-XMTP communicates about breaking revisions in the [XMTP Discord community](https://discord.gg/xmtp), providing as much advance notice as possible. Additionally, breaking revisions in an `xmtp-flutter` release are described on the [Releases page](https://github.com/xmtp/xmtp-flutter/releases).
+XMTP communicates about breaking revisions in the [XMTP Discord community](https://discord.gg/xmtp), providing as much advance notice as possible. Additionally, breaking revisions in an `xmtp-flutter` release will be described on the [Releases page](https://github.com/xmtp/xmtp-flutter/releases).
 
 ## Deprecation
 
@@ -285,7 +282,8 @@ distinct from its XMTP identity on the `production` network, as are the messages
 these identities. In addition, XMTP identities and messages created on the `dev` network can't be
 accessed from or moved to the `production` network, and vice versa.
 
-**Important:** When you [create a client](#create-a-client), it connects to an XMTP `local`
+> **Important**  
+> When you [create a client](#create-a-client), it connects to an XMTP `local`
 environment by default. When you create the `Api` used by the `Client`, it must have a valid network `host`.
 
 Here are some best practices for when to use each environment:
