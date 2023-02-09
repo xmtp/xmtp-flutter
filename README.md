@@ -282,7 +282,7 @@ distinct from its XMTP identity on the `production` network, as are the messages
 these identities. In addition, XMTP identities and messages created on the `dev` network can't be
 accessed from or moved to the `production` network, and vice versa.
 
-> **Important**  
+> **Note**  
 > When you [create a client](#create-a-client), it connects to an XMTP `local`
 environment by default. When you create the `Api` used by the `Client`, it must have a valid network `host`.
 
