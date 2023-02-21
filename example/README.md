@@ -2,6 +2,9 @@
 
 An XMTP example app.
 
+> **Important**  
+> This example app includes experimental caching functionality that has been found to degrade the performance of the example app. The cause of this performance issue is isolated to this caching functionality and the performance issue impacts the example app only. The `xmtp-flutter` client SDK itself is not the cause of and is not impacted by this performance issue.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

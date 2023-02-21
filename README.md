@@ -18,6 +18,9 @@ To learn more about XMTP and get answers to frequently asked questions, see [FAQ
 
 For a basic demonstration of the core concepts and capabilities of the `xmtp-flutter` client SDK, see the [Example app project](https://github.com/xmtp/xmtp-flutter/tree/main/example).
 
+> **Important**  
+> This example app includes experimental caching functionality that has been found to degrade the performance of the example app. The cause of this performance issue is isolated to this caching functionality and the performance issue impacts the example app only. The `xmtp-flutter` client SDK itself is not the cause of and is not impacted by this performance issue.
+
 ## Reference docs
 
 See the [xmtp library](https://pub.dev/documentation/xmtp/latest/xmtp/Client-class.html) for the Flutter client SDK reference documentation.
