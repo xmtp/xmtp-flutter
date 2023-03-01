@@ -108,6 +108,10 @@ var listening = client.streamConversations().listen((convo) {
 await listening.cancel();
 ```
 
+These conversations include all conversations for a user **regardless of which app created the conversation.** This functionality provides the concept of an interoperable inbox, which enables a user to access all of their conversations in any app built with XMTP.
+
+You might choose to provide an additional filtered view of conversations. To learn more, see [Handling multiple conversations with the same blockchain address](#handling-multiple-conversations-with-the-same-blockchain-address) and [Filter conversations using conversation IDs and metadata](https://xmtp.org/docs/client-sdk/javascript/tutorials/filter-conversations).
+
 ### Start a new conversation
 
 You can create a new conversation with any Ethereum address on the XMTP network.
