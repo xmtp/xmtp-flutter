@@ -21,6 +21,9 @@ To learn more about XMTP and get answers to frequently asked questions, see [FAQ
 
 For a basic demonstration of the core concepts and capabilities of the `xmtp-flutter` client SDK, see the [Example app project](https://github.com/xmtp/xmtp-flutter/tree/main/example).
 
+> **Important**  
+> The example app includes a demonstration of how you might approach caching, or offline storage. Be aware that the example app naively performs a full refresh very frequently, **which causes slowdowns**. The underlying `xmtp-flutter` client SDK itself has no performance issues. If you want to provide offline storage in your app, be sure to design your refresh strategies with app performance in mind. Future versions of the example app aim to make this aspect easier to manage.
+
 ## Reference docs
 
 See the [xmtp library](https://pub.dev/documentation/xmtp/latest/xmtp/Client-class.html) for the Flutter client SDK reference documentation.
@@ -94,6 +97,10 @@ for (var convo in conversations) {
   await client.sendMessage(convo, 'gm');
 }
 ```
+
+These conversations include all conversations for a user **regardless of which app created the conversation.** This functionality provides the concept of a [interoperable inbox](https://xmtp.org/docs/dev-concepts/interoperable-inbox), which enables a user to access all of their conversations in any app built with XMTP.
+
+You might choose to provide an additional filtered view of conversations. To learn more, see [Handling multiple conversations with the same blockchain address](#handling-multiple-conversations-with-the-same-blockchain-address) and [Filter conversations using conversation IDs and metadata](https://xmtp.org/docs/client-sdk/javascript/tutorials/filter-conversations).
 
 ### Listen for new conversations
 
