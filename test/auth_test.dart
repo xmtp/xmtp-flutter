@@ -56,7 +56,7 @@ void main() {
     expect(decrypted.identity.address.hexEip55, identity.address.hexEip55);
     expect(decrypted.preKeys.length, 1);
     var preKey = decrypted.v1.preKeys.first.publicKey;
-    var preSigner = await preKey.recoverIdentitySignerPublicKey();
+    var preSigner = preKey.recoverIdentitySignerPublicKey();
     // Make sure the pre key was signed by the identity key.
     expect(preSigner.toEthereumAddress(), identity.address);
   });
@@ -139,8 +139,8 @@ void main() {
       var pre = decrypted.preKeys.isNotEmpty
           ? decrypted.preKeys.first.address.hexEip55
           : "(none)";
-      var preSigner = (await decrypted.v1.preKeys.first.publicKey
-              .recoverIdentitySignerPublicKey())
+      var preSigner = decrypted.v1.preKeys.first.publicKey
+          .recoverIdentitySignerPublicKey()
           .toEthereumAddress()
           .hexEip55;
       debugPrint("wallet $wallet");
