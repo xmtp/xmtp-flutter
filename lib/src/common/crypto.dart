@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:cryptography/dart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pointycastle/ecc/api.dart';
 import 'package:pointycastle/ecc/curves/secp256k1.dart';
@@ -12,10 +13,11 @@ final _aesGcm256 = AesGcm.with256bits(nonceLength: 12);
 final ECDomainParameters _params = ECCurve_secp256k1();
 
 /// This returns the sha256 hash of the input.
-Future<List<int>> sha256(List<int> input) async {
-  var result = await Sha256().hash(input);
-  return result.bytes;
-}
+List<int> sha256(List<int> input) => (const DartSha256().newHashSink()
+      ..add(input)
+      ..close())
+    .hashSync()
+    .bytes;
 
 /// This uses the `secret` to encrypt the `message`.
 Future<xmtp.Ciphertext> encrypt(

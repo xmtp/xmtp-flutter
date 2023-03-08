@@ -95,7 +95,7 @@ class ConversationManagerV1 {
     var header = xmtp.MessageHeaderV1.fromBuffer(msg.v1.headerBytes);
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
     var decoded = await _codecs.decode(encoded);
-    var intro = await _createDecodedMessage(
+    var intro = _createDecodedMessage(
       msg,
       decoded.contentType,
       decoded.content,
@@ -270,13 +270,13 @@ Future<xmtp.MessageV1> encryptMessageV1(
 }
 
 /// This creates the [DecodedMessage] from the various parts.
-Future<DecodedMessage> _createDecodedMessage(
+DecodedMessage _createDecodedMessage(
   xmtp.Message dm,
   xmtp.ContentTypeId contentType,
   Object content,
   xmtp.EncodedContent encoded,
-) async {
-  var id = bytesToHex(await sha256(dm.writeToBuffer()));
+) {
+  var id = bytesToHex(sha256(dm.writeToBuffer()));
   var header = xmtp.MessageHeaderV1.fromBuffer(dm.v1.headerBytes);
   var sender = header.sender.wallet;
   var sentAt = header.timestamp.toDateTime();

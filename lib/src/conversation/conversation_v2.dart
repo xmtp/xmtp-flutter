@@ -209,10 +209,7 @@ class ConversationManagerV2 {
         .map((e) => xmtp.Message.fromBuffer(e.message))
         .map((msg) => _decodedFromMessage(conversation, msg)));
     // Remove nulls (which are discarded bad envelopes).
-    return messages
-        .where((msg) => msg != null)
-        .map((msg) => msg!)
-        .toList();
+    return messages.where((msg) => msg != null).map((msg) => msg!).toList();
   }
 
   /// This exposes the stream of new messages in the [conversation].
@@ -237,7 +234,7 @@ class ConversationManagerV2 {
     var signed = await _decryptMessageV2(msg.v2, conversation.invite);
 
     // Discard the message if the payload is not properly signed.
-    var digest = await sha256(msg.v2.headerBytes + signed.payload);
+    var digest = sha256(msg.v2.headerBytes + signed.payload);
     var signer = ecRecover(
       Uint8List.fromList(digest),
       signed.signature.toMsgSignature(),
