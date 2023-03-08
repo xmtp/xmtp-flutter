@@ -175,8 +175,7 @@ class ConversationManagerV2 {
       createdNs: now,
     );
     var signed = await signContent(auth.keys, header, encoded);
-    var encrypted =
-        await encryptMessageV2(auth.keys, conversation.invite, header, signed);
+    var encrypted = await encryptMessageV2(conversation.invite, header, signed);
     var dm = xmtp.Message(v2: encrypted);
     await api.client.publish(xmtp.PublishRequest(envelopes: [
       xmtp.Envelope(
@@ -232,6 +231,12 @@ class ConversationManagerV2 {
     xmtp.Message msg,
   ) async {
     var signed = await _decryptMessageV2(msg.v2, conversation.invite);
+
+    // Discard the message if the sender key bundle is invalid.
+    if (!signed.sender.isValid()) {
+      debugPrint('discarding message with invalid sender key bundle');
+      return null;
+    }
 
     // Discard the message if the payload is not properly signed.
     var digest = sha256(msg.v2.headerBytes + signed.payload);
@@ -360,7 +365,6 @@ Future<xmtp.InvitationV1> decryptInviteV1(
 /// using the key material from the `invite`.
 @visibleForTesting
 Future<xmtp.MessageV2> encryptMessageV2(
-  xmtp.PrivateKeyBundle keys,
   xmtp.InvitationV1 invite,
   xmtp.MessageHeaderV2 header,
   xmtp.SignedContent signed,
