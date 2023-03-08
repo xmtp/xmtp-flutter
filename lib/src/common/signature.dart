@@ -236,6 +236,20 @@ extension SPKBundleToEthAddresses on xmtp.SignedPublicKeyBundle {
       identityKey.publicKeyBytes.toEthereumAddress();
 
   EthereumAddress get pre => preKey.publicKeyBytes.toEthereumAddress();
+
+  bool isValid() {
+    try {
+      // Make sure we can recover a wallet from the identity key signature.
+      identityKey.recoverWalletSignerPublicKey().toEthereumAddress();
+      // Make sure we can recover the identity from the pre key signature.
+      var identity = identityKey.publicKeyBytes.toEthereumAddress();
+      var recoveredIdentity =
+          preKey.recoverIdentitySignerPublicKey().toEthereumAddress();
+      return recoveredIdentity == identity;
+    } catch (ignore) {
+      return false;
+    }
+  }
 }
 
 /// This adds helper to grab the public key bytes from an [xmtp.SignedPublicKey]

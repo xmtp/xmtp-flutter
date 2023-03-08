@@ -92,6 +92,97 @@ void main() {
     },
   );
 
+  // This creates 2 users having a conversation and prepares
+  // an invalid message from the one pretending to be someone else
+  // to verify that it is properly discarded.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "v2 messaging: invalid sender key bundles on a message should be discarded",
+    () async {
+      var aliceWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var alice = await _createLocalManager(aliceWallet);
+      var aliceAddress = aliceWallet.address.hexEip55;
+
+      var bobWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bob = await _createLocalManager(bobWallet);
+      var bobAddress = bobWallet.address.hexEip55;
+
+      // This is the fake user that Bob pretends to be.
+      var carlWallet =
+          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var carlIdentity = EthPrivateKey.createRandom(Random.secure());
+      var carlKeys = await carlWallet.createIdentity(carlIdentity);
+      // Carl's contact bundle is publically available.
+      var carlContact = createContactBundleV2(carlKeys);
+
+      // Alice initiates the conversation (sending off the invites)
+      var aliceConvo = await alice.newConversation(bobAddress, xmtp.InvitationV1_Context(
+        conversationId: "example.com/sneaky-fake-sender-key-bundle",
+      ));
+      await delayToPropagate();
+      var bobConvo = (await bob.listConversations())[0];
+
+      // Helper to inspect transcript (from Alice's perspective).
+      getTranscript() async => (await alice.listMessages(aliceConvo))
+          .reversed
+          .map((msg) => '${msg.sender.hexEip55}> ${msg.content}');
+
+      await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
+      await delayToPropagate();
+      await bob.sendMessage(bobConvo, "oh hi Alice, it's me Bob!");
+      await delayToPropagate();
+
+      // Everything looks good,
+      expect(await getTranscript(), [
+        "$aliceAddress> hello Bob, it's me Alice!",
+        "$bobAddress> oh hi Alice, it's me Bob!",
+      ]);
+
+      // Now Bob tries to pretend to be Carl using Carl's contact info.
+      var original = await TextCodec().encode("I love you!");
+      var now = nowNs();
+      var header = xmtp.MessageHeaderV2(topic: bobConvo.topic, createdNs: now);
+      var signed = await signContent(bob.auth.keys, header, original);
+
+      // Here's where Bob pretends to be Carl using Carl's public identity key.
+      signed.sender.identityKey = carlContact.v2.keyBundle.identityKey;
+
+      var fakeMessage = await encryptMessageV2(bobConvo.invite, header, signed);
+      await bob.api.client.publish(xmtp.PublishRequest(envelopes: [
+        xmtp.Envelope(
+          contentTopic: bobConvo.topic,
+          timestampNs: now,
+          message: xmtp.Message(v2: fakeMessage).writeToBuffer(),
+        )
+      ]));
+      await delayToPropagate();
+
+      // ... then Alice can inspect the topic directly to see the bad message.
+      var inspecting = await alice.api.client
+          .query(xmtp.QueryRequest(contentTopics: [aliceConvo.topic]));
+      expect(inspecting.envelopes.length, 3 /* = 2 valid + 1 bad */);
+
+      // ... but when she lists messages the fake one is properly discarded.
+      expect(await getTranscript(), [
+        "$aliceAddress> hello Bob, it's me Alice!",
+        "$bobAddress> oh hi Alice, it's me Bob!",
+        // There's no fake message here from Carl
+      ]);
+
+      await alice.sendMessage(aliceConvo, "did you say something?");
+
+      // ... and the conversation continues on, still discarding bad messages.
+      expect(await getTranscript(), [
+        "$aliceAddress> hello Bob, it's me Alice!",
+        "$bobAddress> oh hi Alice, it's me Bob!",
+        // There's no fake message here from Carl
+        "$aliceAddress> did you say something?",
+      ]);
+    },
+  );
+
   // This creates 2 users connected to the API and prepares
   // an invalid invitation (mismatched timestamps)
   // to verify that it is properly discarded.
@@ -230,8 +321,8 @@ void main() {
       var signed = await signContent(bob.auth.keys, header, original);
       // Here's where we pretend to tamper the payload (after signing).
       signed.payload = tampered.writeToBuffer();
-      var tamperedMessage = await encryptMessageV2(
-          bob.auth.keys, bobConvo.invite, header, signed);
+      var tamperedMessage =
+          await encryptMessageV2(bobConvo.invite, header, signed);
       await bob.api.client.publish(xmtp.PublishRequest(envelopes: [
         xmtp.Envelope(
           contentTopic: bobConvo.topic,
