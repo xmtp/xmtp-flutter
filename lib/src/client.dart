@@ -198,6 +198,8 @@ class Client implements Codec<DecodedContent> {
 
   /// This lists messages sent to the [conversation].
   ///
+  /// For listing multiple conversations, see [listBatchMessages].
+  ///
   /// If [start] or [end] are specified then this will only list messages
   /// sent at or after [start] and at or before [end].
   ///
@@ -211,11 +213,29 @@ class Client implements Codec<DecodedContent> {
     int? limit,
     xmtp.SortDirection sort = xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
   }) =>
-      _conversations.listMessages(conversation, start, end, limit, sort);
+      _conversations.listMessages([conversation], start, end, limit, sort);
+
+  /// This lists messages sent to the [conversations].
+  /// This is identical to [listMessages] except it pulls messages from
+  /// multiple conversations in a single call.
+  Future<List<DecodedMessage>> listBatchMessages(
+    Iterable<Conversation> conversations, {
+    DateTime? start,
+    DateTime? end,
+    int? limit,
+    xmtp.SortDirection sort = xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
+  }) =>
+      _conversations.listMessages(conversations, start, end, limit, sort);
 
   /// This exposes a stream of new messages sent to the [conversation].
+  /// For streaming multiple conversations, see [streamBatchMessages].
   Stream<DecodedMessage> streamMessages(Conversation conversation) =>
-      _conversations.streamMessages(conversation);
+      _conversations.streamMessages([conversation]);
+
+  /// This exposes a stream of new messages sent to any of the [conversations].
+  Stream<DecodedMessage> streamBatchMessages(
+          Iterable<Conversation> conversations) =>
+      _conversations.streamMessages(conversations);
 
   /// This sends a new message to the [conversation].
   /// It returns the [DecodedMessage] to simplify optimistic local updates.
@@ -232,6 +252,15 @@ class Client implements Codec<DecodedContent> {
         content,
         contentType: contentType,
       );
+
+  /// This sends the already [encoded] message to the [conversation].
+  /// This is identical to [sendMessage] but can be helpful when you
+  /// have already encoded the message to send.
+  Future<DecodedMessage> sendMessageEncoded(
+    Conversation conversation,
+    xmtp.EncodedContent encoded,
+  ) =>
+      _conversations.sendMessageEncoded(conversation, encoded);
 
   /// These use all registered codecs to decode and encode content.
   ///

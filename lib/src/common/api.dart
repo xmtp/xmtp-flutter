@@ -118,21 +118,44 @@ class _DebugLogInterceptor extends grpc.ClientInterceptor {
     grpc.ClientUnaryInvoker<Q, R> invoker,
   ) {
     final reqN = _nextReqN();
+    final clock = Stopwatch()..start();
     debugPrint('xmtp: #$reqN --> ${method.path}');
     if (isDebugLoggingTopics) {
       if (request is xmtp.PublishRequest) {
         for (var e in request.envelopes) {
-          debugPrint(' topic: ${e.contentTopic}');
+          debugPrint('  topic: ${e.contentTopic}');
         }
       }
       if (request is xmtp.QueryRequest) {
-        for (var topic in request.contentTopics) {
-          debugPrint(' topic: $topic');
+        for (var topic in request.contentTopics.take(3)) {
+          debugPrint('  topic: $topic');
+        }
+        var more = request.contentTopics.length - 3;
+        if (more > 0) {
+          debugPrint('         ... and $more more');
+        }
+        if (request.hasStartTimeNs()) {
+          debugPrint('  start: ${request.startTimeNs}');
+        }
+        if (request.hasEndTimeNs()) {
+          debugPrint('    end: ${request.startTimeNs}');
+        }
+        if (request.hasPagingInfo()) {
+          if (request.pagingInfo.hasLimit()) {
+            debugPrint('  limit: ${request.pagingInfo.limit}');
+          }
+          if (request.pagingInfo.hasDirection()) {
+            debugPrint('    dir: ${request.pagingInfo.direction}');
+          }
+          if (request.pagingInfo.hasCursor()) {
+            debugPrint(' cursor: ${request.pagingInfo.cursor.whichCursor()}');
+          }
         }
       }
     }
     var res = invoker(method, request, options);
-    res.then((_) => debugPrint('xmtp: <-- #$reqN ${method.path}'));
+    res.then((_) => debugPrint(
+        'xmtp: <-- #$reqN ${method.path} ${clock.elapsedMilliseconds} ms'));
     return res;
   }
 
@@ -147,8 +170,8 @@ class _DebugLogInterceptor extends grpc.ClientInterceptor {
     debugPrint('xmtp: #$reqN <-> ${method.path}');
     if (isDebugLoggingTopics) {
       requests.single.then((req) {
-        debugPrint(
-            ' topic: ${(req as xmtp.SubscribeRequest).contentTopics.first}');
+        var topics = (req as xmtp.SubscribeRequest).contentTopics;
+        debugPrint(' topic: ${topics.isEmpty ? "(none)" : topics.first}');
       });
     }
     return invoker(method, requests, options);
