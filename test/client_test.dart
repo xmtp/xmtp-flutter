@@ -8,6 +8,7 @@ import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 import 'package:xmtp/src/common/api.dart';
 import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp/src/content/codec.dart';
+import 'package:xmtp/src/content/text_codec.dart';
 import 'package:xmtp/src/client.dart';
 
 import 'test_server.dart';
@@ -69,17 +70,25 @@ void main() {
       await bob.sendMessage(bobConvo, "oh, hello Alice!");
       await delayToPropagate();
 
+      // Bob sends an already-encoded message
+      await bob.sendMessageEncoded(
+          bobConvo, await TextCodec().encode("I have a note for you"));
+      await delayToPropagate();
+
       aliceMessages = await alice.listMessages(aliceConvo);
-      expect(aliceMessages.length, 2);
+      expect(aliceMessages.length, 3);
       expect(aliceMessages[0].sender, bobWallet.address);
-      expect(aliceMessages[0].content, "oh, hello Alice!");
-      expect(aliceMessages[1].sender, aliceWallet.address);
-      expect(aliceMessages[1].content, "hello Bob, it's me Alice!");
+      expect(aliceMessages[0].content, "I have a note for you");
+      expect(aliceMessages[1].sender, bobWallet.address);
+      expect(aliceMessages[1].content, "oh, hello Alice!");
+      expect(aliceMessages[2].sender, aliceWallet.address);
+      expect(aliceMessages[2].content, "hello Bob, it's me Alice!");
 
       await bobListening.cancel();
       expect(transcript, [
         "$aliceAddress> hello Bob, it's me Alice!",
         "$bobAddress> oh, hello Alice!",
+        "$bobAddress> I have a note for you",
       ]);
     },
   );
@@ -204,20 +213,29 @@ void main() {
         bob.address.hex,
         conversationId: "https://example.com/alice-bob-discussing-work",
       );
-      await alice.sendMessage(work, "Bob, let's chat here about work.");
-      await alice.sendMessage(work, "Our quarterly report is due next week.");
-
       var play = await alice.newConversation(
         bob.address.hex,
         conversationId: "https://example.com/alice-bob-discussing-play",
       );
+      await delayToPropagate();
+
+      // Bob starts streaming both conversations
+      expect((await bob.listConversations()).length, 2);
+      var transcript = [];
+      var bobListening = bob.streamBatchMessages([work, play]).listen((msg) =>
+          transcript.add('${msg.topic} ${msg.sender.hex}> ${msg.content}'));
+
+      await alice.sendMessage(work, "Bob, let's chat here about work.");
+      await delayToPropagate();
+      await alice.sendMessage(work, "Our quarterly report is due next week.");
+      await delayToPropagate();
       await alice.sendMessage(play, "Bob, let's chat here about play.");
+      await delayToPropagate();
       await alice.sendMessage(play, "I don't want to work.");
+      await delayToPropagate();
       await alice.sendMessage(play, "I just want to bang on my drum all day.");
       await delayToPropagate();
 
-      var bobChats = await bob.listConversations();
-      expect(bobChats.length, 2);
       expect((await bob.listMessages(work)).map((m) => m.content).toList(), [
         "Our quarterly report is due next week.",
         "Bob, let's chat here about work.",
@@ -226,6 +244,15 @@ void main() {
         "I just want to bang on my drum all day.",
         "I don't want to work.",
         "Bob, let's chat here about play.",
+      ]);
+      expect((await bob.listBatchMessages([work, play])).length, 5);
+      await bobListening.cancel();
+      expect(transcript, [
+        "${work.topic} ${alice.address.hex}> Bob, let's chat here about work.",
+        "${work.topic} ${alice.address.hex}> Our quarterly report is due next week.",
+        "${play.topic} ${alice.address.hex}> Bob, let's chat here about play.",
+        "${play.topic} ${alice.address.hex}> I don't want to work.",
+        "${play.topic} ${alice.address.hex}> I just want to bang on my drum all day.",
       ]);
     },
   );

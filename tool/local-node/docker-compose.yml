@@ -11,6 +11,7 @@ services:
       - --message-db-reader-connection-string=postgres://postgres:xmtp@db:5432/postgres?sslmode=disable
       - --lightpush
       - --filter
+      - --log-level=DEBUG
       - --ws-port=9001
       - --wait-for-db=30s
       - --api.authn.enable

@@ -168,8 +168,16 @@ class ConversationManagerV2 {
     xmtp.ContentTypeId? contentType,
   }) async {
     contentType ??= contentTypeText;
-    var now = nowNs();
     var encoded = await _codecs.encode(DecodedContent(contentType, content));
+    return sendMessageEncoded(conversation, encoded);
+  }
+
+  /// This sends the [encoded] message to the [conversation].
+  Future<DecodedMessage> sendMessageEncoded(
+    Conversation conversation,
+    xmtp.EncodedContent encoded,
+  ) async {
+    var now = nowNs();
     var header = xmtp.MessageHeaderV2(
       topic: conversation.topic,
       createdNs: now,
@@ -184,19 +192,23 @@ class ConversationManagerV2 {
         message: dm.writeToBuffer(),
       ),
     ]));
-    return _createDecodedMessage(dm, signed, contentType, content, encoded);
+    return _createDecodedMessage(dm, signed);
   }
 
-  /// This lists the current messages in the [conversation]
+  /// This lists the current messages in the [conversations]
   Future<List<DecodedMessage>> listMessages(
-    Conversation conversation, [
+    Iterable<Conversation> conversations, [
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
+    if (conversations.isEmpty) {
+      return [];
+    }
+    var convoByTopic = {for (var c in conversations) c.topic: c};
     var listing = await api.client.query(xmtp.QueryRequest(
-      contentTopics: [conversation.topic],
+      contentTopics: conversations.map((c) => c.topic),
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
       pagingInfo: xmtp.PagingInfo(
@@ -205,23 +217,32 @@ class ConversationManagerV2 {
       ),
     ));
     var messages = await Future.wait(listing.envelopes
-        .map((e) => xmtp.Message.fromBuffer(e.message))
-        .map((msg) => _decodedFromMessage(conversation, msg)));
+        .where((e) => convoByTopic.containsKey(e.contentTopic))
+        .map((e) => _decodedFromMessage(
+              convoByTopic[e.contentTopic]!,
+              xmtp.Message.fromBuffer(e.message),
+            )));
     // Remove nulls (which are discarded bad envelopes).
     return messages.where((msg) => msg != null).map((msg) => msg!).toList();
   }
 
-  /// This exposes the stream of new messages in the [conversation].
-  Stream<DecodedMessage> streamMessages(
-    Conversation conversation,
-  ) =>
-      api.client
-          .subscribe(xmtp.SubscribeRequest(contentTopics: [conversation.topic]))
-          .map((e) => xmtp.Message.fromBuffer(e.message))
-          .asyncMap((msg) => _decodedFromMessage(conversation, msg))
-          // Remove nulls (which are discarded bad envelopes).
-          .where((msg) => msg != null)
-          .map((msg) => msg!);
+  /// This exposes the stream of new messages in the [conversations].
+  Stream<DecodedMessage> streamMessages(Iterable<Conversation> conversations) {
+    if (conversations.isEmpty) {
+      return const Stream.empty();
+    }
+    var convoByTopic = {for (var c in conversations) c.topic: c};
+    return api.client
+        .subscribe(xmtp.SubscribeRequest(contentTopics: convoByTopic.keys))
+        .where((e) => convoByTopic.containsKey(e.contentTopic))
+        .asyncMap((e) => _decodedFromMessage(
+              convoByTopic[e.contentTopic]!,
+              xmtp.Message.fromBuffer(e.message),
+            ))
+        // Remove nulls (which are discarded bad envelopes).
+        .where((msg) => msg != null)
+        .map((msg) => msg!);
+  }
 
   /// This decrypts and decodes the [xmtp.Message].
   ///
@@ -248,16 +269,7 @@ class ConversationManagerV2 {
       debugPrint('discarding message with bad signature');
       return null;
     }
-
-    var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
-    var decoded = await _codecs.decode(encoded);
-    return _createDecodedMessage(
-      msg,
-      signed,
-      decoded.contentType,
-      decoded.content,
-      encoded,
-    );
+    return _createDecodedMessage(msg, signed);
   }
 
   /// This helper sends the [sealed] invite to [_me] and to [peer].
@@ -275,6 +287,29 @@ class ConversationManagerV2 {
           ),
         ),
       ));
+
+  /// This creates the [DecodedMessage] from the various parts.
+  Future<DecodedMessage> _createDecodedMessage(
+    xmtp.Message dm,
+    xmtp.SignedContent signed,
+  ) async {
+    var encoded = xmtp.EncodedContent.fromBuffer(signed.payload);
+    var decoded = await _codecs.decode(encoded);
+    var id = bytesToHex(sha256(dm.writeToBuffer()));
+    var header = xmtp.MessageHeaderV2.fromBuffer(dm.v2.headerBytes);
+    var sender = signed.sender.wallet;
+    var sentAt = header.createdNs.toDateTime();
+    return DecodedMessage(
+      xmtp.Message_Version.v2,
+      sentAt,
+      sender,
+      encoded,
+      decoded.contentType,
+      decoded.content,
+      id: id,
+      topic: header.topic,
+    );
+  }
 }
 
 /// This uses the provided `context` to create a new conversation invitation.
@@ -406,7 +441,7 @@ Future<xmtp.SignedContent> signContent(
 ) async {
   var headerBytes = header.writeToBuffer();
   var payload = content.writeToBuffer();
-  var digest = await sha256(headerBytes + payload);
+  var digest = sha256(headerBytes + payload);
   var preKey = keys.preKeys.first;
   var signature = sign(Uint8List.fromList(digest), preKey.privateKey);
   return xmtp.SignedContent(
@@ -415,29 +450,5 @@ Future<xmtp.SignedContent> signContent(
     signature: xmtp.Signature(
       ecdsaCompact: signature.toEcdsaCompact(),
     ),
-  );
-}
-
-/// This creates the [DecodedMessage] from the various parts.
-Future<DecodedMessage> _createDecodedMessage(
-  xmtp.Message dm,
-  xmtp.SignedContent signed,
-  xmtp.ContentTypeId contentType,
-  Object content,
-  xmtp.EncodedContent encoded,
-) async {
-  var id = bytesToHex(await sha256(dm.writeToBuffer()));
-  var header = xmtp.MessageHeaderV2.fromBuffer(dm.v2.headerBytes);
-  var sender = signed.sender.wallet;
-  var sentAt = header.createdNs.toDateTime();
-  return DecodedMessage(
-    xmtp.Message_Version.v2,
-    sentAt,
-    sender,
-    encoded,
-    contentType,
-    content,
-    id: id,
-    topic: header.topic,
   );
 }

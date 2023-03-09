@@ -59,16 +59,15 @@ void main() {
 
       // Bob starts listening to the stream and recording the transcript.
       var transcript = [];
-      var bobListening = bob
-          .streamMessages(bobConvo)
-          .listen((msg) => transcript.add('${msg.sender.hex}> ${msg.content}'));
+      var bobListening = bob.streamMessages([bobConvo]).listen(
+          (msg) => transcript.add('${msg.sender.hex}> ${msg.content}'));
 
       // Alice sends the first message.
       await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
       await delayToPropagate();
 
       // And Bob see the message in the conversation.
-      var bobMessages = await bob.listMessages(bobConvo);
+      var bobMessages = await bob.listMessages([bobConvo]);
       expect(bobMessages.length, 1);
       expect(bobMessages[0].sender, aliceWallet.address);
       expect(bobMessages[0].content, "hello Bob, it's me Alice!");
@@ -77,7 +76,7 @@ void main() {
       await bob.sendMessage(bobConvo, "oh, hello Alice!");
       await delayToPropagate();
 
-      var aliceMessages = await alice.listMessages(aliceConvo);
+      var aliceMessages = await alice.listMessages([aliceConvo]);
       expect(aliceMessages.length, 2);
       expect(aliceMessages[0].sender, bobWallet.address);
       expect(aliceMessages[0].content, "oh, hello Alice!");
@@ -118,14 +117,16 @@ void main() {
       var carlContact = createContactBundleV2(carlKeys);
 
       // Alice initiates the conversation (sending off the invites)
-      var aliceConvo = await alice.newConversation(bobAddress, xmtp.InvitationV1_Context(
-        conversationId: "example.com/sneaky-fake-sender-key-bundle",
-      ));
+      var aliceConvo = await alice.newConversation(
+          bobAddress,
+          xmtp.InvitationV1_Context(
+            conversationId: "example.com/sneaky-fake-sender-key-bundle",
+          ));
       await delayToPropagate();
       var bobConvo = (await bob.listConversations())[0];
 
       // Helper to inspect transcript (from Alice's perspective).
-      getTranscript() async => (await alice.listMessages(aliceConvo))
+      getTranscript() async => (await alice.listMessages([aliceConvo]))
           .reversed
           .map((msg) => '${msg.sender.hexEip55}> ${msg.content}');
 
@@ -286,7 +287,7 @@ void main() {
       expect(bobConvo.conversationId, "example.com/valid");
 
       // Helper to inspect transcript (from Alice's perspective).
-      getTranscript() async => (await alice.listMessages(aliceConvo))
+      getTranscript() async => (await alice.listMessages([aliceConvo]))
           .reversed
           .map((msg) => '${msg.sender.hex}> ${msg.content}');
 
@@ -374,7 +375,7 @@ void main() {
       var conversations = await v2.listConversations();
       for (var convo in conversations) {
         debugPrint("dm w/ ${convo.peer}");
-        var dms = await v2.listMessages(convo);
+        var dms = await v2.listMessages([convo]);
         for (var j = 0; j < dms.length; ++j) {
           var dm = dms[j];
           debugPrint("${dm.sentAt} ${dm.sender.hexEip55}> ${dm.content}");
