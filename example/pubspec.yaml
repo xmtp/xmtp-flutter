@@ -23,8 +23,7 @@ dependencies:
   quiver: ^3.2.1
   retry: ^3.1.0
   shared_preferences: ^2.0.18
-  sqlcipher_flutter_libs: ^0.5.4
-  sqlite3: ^1.9.3
+  sqlite3_flutter_libs: ^0.5.13
   url_launcher: ^6.1.10
   walletconnect_dart: ^0.0.11
   web3dart: ^2.6.1

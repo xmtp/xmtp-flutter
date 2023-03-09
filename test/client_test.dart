@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
@@ -312,6 +313,47 @@ void main() {
         for (var msg in messages) {
           debugPrint(' ${msg.sentAt} ${msg.sender}> ${msg.content}');
         }
+      }
+    },
+  );
+
+  // This creates a user and sends them lots of messages from other users.
+  // This aims to be useful for prepping an account to test performance.
+  test(
+    skip: "manual testing",
+    "messaging: send lots of messages to me",
+    () async {
+      // Starts this many conversations:
+      const conversationCount = 30;
+      // ... with this many messages in each:
+      const messagesPerCount = 5;
+
+      var recipientKey = EthPrivateKey.createRandom(Random.secure());
+      var recipientClient = await Client.createFromWallet(
+          createTestServerApi(), recipientKey.asSigner());
+      var recipient = recipientClient.address.hex;
+      debugPrint('sending messages to $recipient');
+      debugPrint(' private key: ${bytesToHex(recipientKey.privateKey)}');
+      for (var i = 0; i < conversationCount; ++i) {
+        var senderKey = EthPrivateKey.createRandom(Random.secure());
+        var senderWallet = senderKey.asSigner();
+        var senderApi = createTestServerApi(debugLogRequests: false);
+        var sender = await Client.createFromWallet(senderApi, senderWallet);
+        debugPrint('${i + 1}/$conversationCount: '
+            'sending $messagesPerCount from ${sender.address.hex}');
+        var convo = await sender.newConversation(recipient);
+        await Future.wait(Iterable.generate(
+          messagesPerCount,
+          (_) => sender.sendMessage(convo, """
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, 
+sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris 
+nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in 
+reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla 
+pariatur. Excepteur sint occaecat cupidatat non proident, sunt in 
+culpa qui officia deserunt mollit anim id est laborum.
+"""),
+        ));
       }
     },
   );

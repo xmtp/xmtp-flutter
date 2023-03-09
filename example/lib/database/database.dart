@@ -1,14 +1,9 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:xmtp/xmtp.dart' as xmtp;
 
+import '../codecs.dart';
 import 'adapters.dart';
-import 'encryption.dart';
+import 'isolate.dart';
 
 /// The generated code from the Table definitions.
 ///
@@ -71,39 +66,16 @@ class Messages extends Table {
 /// It exposes methods for querying the database.
 ///
 /// And it also includes a constructor to [create] an instance
-/// of this database using an encrypted local database.
-/// See [getOrCreateEncryptionKey].
+/// of this database using a local database.
 @DriftDatabase(
   tables: [Conversations, Messages],
   include: {'database.performance.drift'},
 )
 class Database extends _$Database {
-  final xmtp.Codec<xmtp.DecodedContent> decoder;
+  Database(QueryExecutor executor) : super(executor);
 
-  Database(this.decoder, QueryExecutor executor) : super(executor);
-
-  /// Create a local encrypted instance of the database.
-  ///
-  /// This creates (or opens) the database in the application
-  /// documents directory using a randomly generated key for encryption.
-  ///
-  /// Since message content is stored as [xmtp.EncodedContent], this
-  /// uses the [decoder] to get [xmtp.DecodedMessage.content] for display.
-  static Database create(xmtp.Codec<xmtp.DecodedContent> decoder) {
-    configureSqlCipherLibraries();
-    return Database(decoder, LazyDatabase(() async {
-      var docs = await getApplicationDocumentsDirectory();
-      var file = File(p.join(docs.path, 'db.sqlite'));
-      var encryptionKey = await getOrCreateEncryptionKey();
-      return NativeDatabase(
-        file,
-        logStatements: kDebugMode,
-        setup: (db) {
-          configureSqlCipherDatabase(db, encryptionKey);
-        },
-      );
-    }));
-  }
+  Database.connect()
+      : this(DatabaseConnection.delayed(connectToDatabase('app.db')));
 
   @override
   int get schemaVersion => 1;
@@ -139,9 +111,33 @@ class Database extends _$Database {
       (conversations.select()..where((c) => c.topic.equals(topic)))
           .map((c) => c.toXmtp());
 
+  /// Select the most recently created conversation.
+  SingleOrNullSelectable<xmtp.Conversation> selectLastConversation() =>
+      (conversations.select()
+            ..orderBy([
+              (c) =>
+                  OrderingTerm(expression: c.createdAt, mode: OrderingMode.desc)
+            ])
+            ..limit(1))
+          .map((c) => c.toXmtp());
+
   /// List all conversations.
   MultiSelectable<xmtp.Conversation> selectConversations() =>
-      conversations.select().map((convo) => convo.toXmtp());
+      (conversations.select()
+            ..orderBy([
+              (c) =>
+                  OrderingTerm(expression: c.createdAt, mode: OrderingMode.desc)
+            ]))
+          .map((convo) => convo.toXmtp());
+
+  /// List conversations with no messages yet.
+  MultiSelectable<xmtp.Conversation> selectEmptyConversations() {
+    // TODO: perf tune (consider just writing the SQL)
+    return (conversations.select()
+          ..where((c) => notExistsQuery(
+              messages.select()..where((msg) => msg.topic.equalsExp(c.topic)))))
+        .map((convo) => convo.toXmtp());
+  }
 
   /// List messages in the conversation.
   MultiSelectable<xmtp.DecodedMessage> selectMessages(String topic) =>
@@ -153,11 +149,29 @@ class Database extends _$Database {
                     mode: OrderingMode.desc,
                   )
             ]))
-          .asyncMap((msg) async => msg.toXmtp(decoder));
+          .asyncMap((msg) async => msg.toXmtp(codecs));
 
-  /// Delete all stored conversations and messages.
-  Future<void> clear() async => Future.wait([
-        delete(conversations).go(),
-        delete(messages).go(),
-      ]);
+  /// Select the last message in the conversation.
+  SingleOrNullSelectable<xmtp.DecodedMessage> selectLastMessage(String topic) =>
+      (messages.select()
+            ..where((msg) => msg.topic.equals(topic))
+            ..orderBy([
+              (msg) => OrderingTerm(
+                    expression: msg.sentAt,
+                    mode: OrderingMode.desc,
+                  )
+            ])
+            ..limit(1))
+          .asyncMap((msg) async => msg.toXmtp(codecs));
+
+  SingleOrNullSelectable<DateTime?> selectLastReceivedSentAt() =>
+      (messages.selectOnly()..addColumns([messages.sentAt.max()]))
+          .map((res) => res.read(messages.sentAt.max()))
+          .map((value) => value == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(value));
+
+  /// Delete all tables
+  Future<void> clear() async =>
+      Future.wait(allTables.map((t) => delete(t).go()));
 }

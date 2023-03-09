@@ -41,7 +41,7 @@ class ConversationPage extends HookWidget {
     return Scaffold(
       appBar: AppBar(),
       body: RefreshIndicator(
-        onRefresh: refresher.data ?? () => Future.value(),
+        onRefresh: refresher,
         child: ListView.builder(
           reverse: true,
           // separatorBuilder: (BuildContext context, int index) => const Divider(color: Colors.brown),

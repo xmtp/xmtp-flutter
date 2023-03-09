@@ -1,14 +1,9 @@
 import 'package:async/async.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart' as fh;
-import 'package:quiver/cache.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:xmtp/xmtp.dart' as xmtp;
-import 'package:http/http.dart' as http;
-
-import 'config.dart';
-import 'session.dart';
-import 'ens.dart';
+import 'session/foreground_session.dart';
 
 /// Helpful hooks used throughout the app.
 ///
@@ -16,37 +11,14 @@ import 'ens.dart';
 /// and https://medium.com/@dan_abramov/making-sense-of-react-hooks-fdbde8803889
 
 /// The configured user's address.
-EthereumAddress useMe() => session.me;
-
-var _web3 = Web3Client(ethRpcUrl, http.Client());
-var _addressNames = MapCache<EthereumAddress, String>.lru(maximumSize: 100);
-
-/// This returns a name for the [address].
-/// If there is no ENS name it uses an abbreviation of the [address] hex.
-String useAddressName(EthereumAddress? address) {
-  var hex = address?.hexEip55 ?? "";
-  var abbreviated =
-      hex.isEmpty ? "" : "${hex.substring(0, 6)}…${hex.substring(38)}";
-  var lookup = address == null
-      ? Future.value(null)
-      : _addressNames.get(
-          address,
-          ifAbsent: (address) =>
-              _web3.lookupAddress(address).then((name) => name ?? ""),
-        );
-  var name = fh.useFuture(lookup, initialData: abbreviated);
-  if ((name.data ?? "").isEmpty) {
-    return abbreviated;
-  }
-  return name.data!;
-}
+EthereumAddress? useMe() => session.me;
 
 /// The list of all conversations.
 ///
 /// This updates whenever new conversations arrive.
 ///
 /// This causes the remote list of conversations to be
-/// streamed by the [Session] while the hooked widget is active.
+/// streamed by the [ForegroundSession] while the hooked widget is active.
 AsyncSnapshot<List<xmtp.Conversation>> useConversationList() =>
     _useLookupStream(
       () => session.findConversations(),
@@ -54,18 +26,14 @@ AsyncSnapshot<List<xmtp.Conversation>> useConversationList() =>
     );
 
 /// The details of a single conversation.
-AsyncSnapshot<xmtp.Conversation?> useConversation(String topic) =>
-    _useLookupStream(
-      () => session.findConversation(topic),
-      () => session.watchConversation(topic),
-      [topic],
-    );
+AsyncSnapshot<xmtp.Conversation?> useConversation(String topic) => fh
+    .useFuture(fh.useMemoized(() => session.findConversation(topic), [topic]));
 
 /// The list of messages in a conversation.
 ///
 /// This updates whenever a new message in this [topic] arrives.
 ///
-/// This causes the remote [topic] to be streamed by the [Session]
+/// This causes the remote [topic] to be streamed by the [ForegroundSession]
 /// while the hooked widget is active.
 AsyncSnapshot<List<xmtp.DecodedMessage>> useMessages(String topic) =>
     _useLookupStream(
@@ -101,12 +69,8 @@ AsyncSnapshot<int> useNewMessageCount(String topic) => _useLookupStream(
 ///
 /// Any new messages are added to the database which automatically
 /// notifies any relevant listeners.
-AsyncSnapshot<Future<List<xmtp.DecodedMessage>> Function()?>
-    useMessagesRefresher(String topic) {
-  var convo = useConversation(topic);
-  return AsyncSnapshot.withData(convo.connectionState,
-      convo.hasData ? () => session.refreshMessages(convo.data!) : null);
-}
+Future<void> Function() useMessagesRefresher(String topic) =>
+    () => session.refreshMessages([topic]);
 
 /// A callable to explicitly refresh the list of conversations.
 ///
