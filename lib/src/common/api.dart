@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:grpc/grpc.dart' as grpc;
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
-const sdkVersion = '0.0.1';
+const sdkVersion = '0.0.2';
 const clientVersion = "xmtp-flutter/$sdkVersion";
 // TODO: consider generating these ^ during build.
 
