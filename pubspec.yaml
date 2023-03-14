@@ -4,26 +4,26 @@ version: 0.0.2-development
 repository: https://github.com/xmtp/xmtp-flutter
 
 environment:
-  sdk: '>=2.18.4 <3.0.0'
-  flutter: ">=1.17.0"
+  sdk: '>=2.19.0 <3.0.0'
+  flutter: ">=3.7.0"
 
 dependencies:
-  async: ^2.9.0
+  async: ^2.10.0
   grpc: ^3.1.0
-  cryptography: ^2.0.5
-  cryptography_flutter: ^2.0.2
-  fixnum: ^1.0.1
+  cryptography: ^2.5.0
+  cryptography_flutter: ^2.3.0
+  fixnum: ^1.1.0
   flutter:
     sdk: flutter
-  pointycastle: ^3.6.0
-  quiver: ^3.1.0
-  web3dart: ^2.4.1
+  pointycastle: ^3.6.2
+  quiver: ^3.2.1
+  web3dart: ^2.6.1
   xmtp_proto: ^0.0.1-development
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  flutter_lints: ^2.0.1
   mocktail: ^0.3.0
 
 flutter:
