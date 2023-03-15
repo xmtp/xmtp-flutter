@@ -20,11 +20,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: listing, reading, writing, streaming",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -98,10 +96,8 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "contacts: can message only when their contact has been published",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceAddress = aliceWallet.address.hex;
       var bobAddress = bobWallet.address.hex;
       // At this point, neither Alice nor Bob has signed up yet.
@@ -139,11 +135,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "listing and sorting parameters",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -183,8 +177,7 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: self messages should be prevented",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       await delayToPropagate();
@@ -199,11 +192,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: distinguish conversations using conversationId",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -262,11 +253,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "codecs: using a custom codec for integers",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(
         aliceApi,
@@ -313,8 +302,7 @@ void main() {
       // Setup the API client.
       var api =
           Api.create(host: 'dev.xmtp.network', port: 5556, isSecure: true);
-      var wallet =
-          await EthPrivateKey.fromHex("... private key ...").asSigner();
+      var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var client = await Client.createFromWallet(api, wallet);
       var conversations = await client.listConversations();
       for (var convo in conversations) {

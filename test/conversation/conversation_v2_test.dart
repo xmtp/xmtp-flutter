@@ -24,10 +24,8 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "v2 messaging: invites, reading, writing, streaming",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
       var aliceAddress = aliceWallet.address.hex;
@@ -98,19 +96,16 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "v2 messaging: invalid sender key bundles on a message should be discarded",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var aliceAddress = aliceWallet.address.hexEip55;
 
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bob = await _createLocalManager(bobWallet);
       var bobAddress = bobWallet.address.hexEip55;
 
       // This is the fake user that Bob pretends to be.
-      var carlWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var carlWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var carlIdentity = EthPrivateKey.createRandom(Random.secure());
       var carlKeys = await carlWallet.createIdentity(carlIdentity);
       // Carl's contact bundle is publically available.
@@ -191,10 +186,8 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "v2 messaging: mismatched timestamps on an invite should be discarded",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
       var bobAddress = bobWallet.address.hex;
@@ -261,10 +254,8 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "v2 messaging: bad signature on a message should be discarded",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
       var aliceAddress = aliceWallet.address.hex;
@@ -359,8 +350,7 @@ void main() {
         isSecure: true,
         debugLogRequests: true,
       );
-      var wallet =
-          await EthPrivateKey.fromHex("... private key ...").asSigner();
+      var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(wallet.address, api);
       var codecs = CodecRegistry()..registerCodec(TextCodec());
       var contacts = ContactManager(api);

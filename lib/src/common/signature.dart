@@ -23,9 +23,10 @@ class Signer {
 
 /// This adds a helper to [Credentials] to treat it as a [Signer].
 extension CredentialsToSigner on Credentials {
-  Future<Signer> asSigner() async => Signer.create(
-      (await extractAddress()).hexEip55,
-      (text) => signPersonalMessage(Uint8List.fromList(utf8.encode(text))));
+  Signer asSigner() => Signer.create(
+      address.hexEip55,
+      (text) async => signPersonalMessageToUint8List(
+          Uint8List.fromList(utf8.encode(text))));
 }
 
 /// This contains the XMTP signature texts and related utilities.

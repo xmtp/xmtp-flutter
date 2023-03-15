@@ -21,10 +21,8 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "v1 messaging: intros, reading, writing, streaming",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
       var aliceAddress = aliceWallet.address.hex;
@@ -95,8 +93,7 @@ void main() {
         isSecure: true,
         debugLogRequests: true,
       );
-      var wallet =
-          await EthPrivateKey.fromHex("... private key ...").asSigner();
+      var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(wallet.address, api);
       var contacts = ContactManager(api);
       var codecs = CodecRegistry()..registerCodec(TextCodec());
