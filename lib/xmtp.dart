@@ -2,6 +2,7 @@
 /// for Flutter applications written in dart.
 library xmtp;
 
+export 'src/auth.dart' show CompatPrivateKeyBundle;
 export 'src/common/api.dart' show Api;
 export 'src/common/signature.dart' show Signer, CredentialsToSigner;
 export 'src/client.dart' show Client;

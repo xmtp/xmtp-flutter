@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'pages/home_page.dart';
 import 'pages/login_page.dart';
 import 'pages/conversation_page.dart';
-import 'session.dart';
+import 'session/foreground_session.dart';
 
 /// Create the [GoRouter] for navigating within the app.
 GoRouter createRouter() => GoRouter(

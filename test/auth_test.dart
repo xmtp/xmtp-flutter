@@ -14,14 +14,14 @@ import 'test_server.dart';
 
 void main() {
   test('creating authToken', () async {
-    var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
+    var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
     var identity = EthPrivateKey.createRandom(Random.secure());
 
     // Prompt them to sign "XMTP : Create Identity ..."
     var authorized = await alice.createIdentity(identity);
 
     // Create the `Authorization: Bearer $authToken` for API calls.
-    var authToken = await authorized.createAuthToken();
+    var authToken = authorized.createAuthToken();
 
     var token = xmtp.Token.fromBuffer(base64.decode(authToken));
     var authData = xmtp.AuthData.fromBuffer(token.authDataBytes);
@@ -39,7 +39,7 @@ void main() {
   });
 
   test('enabling saving and loading of stored keys', () async {
-    var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
+    var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
     var identity = EthPrivateKey.createRandom(Random.secure());
 
     // Prompt them to sign "XMTP : Create Identity ..."
@@ -56,7 +56,7 @@ void main() {
     expect(decrypted.identity.address.hexEip55, identity.address.hexEip55);
     expect(decrypted.preKeys.length, 1);
     var preKey = decrypted.v1.preKeys.first.publicKey;
-    var preSigner = await preKey.recoverIdentitySignerPublicKey();
+    var preSigner = preKey.recoverIdentitySignerPublicKey();
     // Make sure the pre key was signed by the identity key.
     expect(preSigner.toEthereumAddress(), identity.address);
   });
@@ -68,7 +68,7 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "storing private keys",
     () async {
-      var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
 
       // At first, alice authenticates and saves her keys to the network.
       var apiFirst = createTestServerApi();
@@ -95,20 +95,20 @@ void main() {
     () async {
       // We use a very short duration here to speed up the test.
       var maxAge = const Duration(milliseconds: 100);
-      var alice = await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var api = createTestServerApi();
       var auth = AuthManager(alice.address, api, maxAuthTokenAge: maxAge);
       await auth.authenticateWithCredentials(alice);
 
       // At first there should be an initial non-empty auth token.
-      var initialAuthToken = await auth.getAuthToken();
+      var initialAuthToken = auth.getAuthToken();
       expect(initialAuthToken, isNotEmpty);
 
       // Then when we wait long enough for it to expire...
       await Future.delayed(maxAge * 2);
 
       // ... we should get a new one for the next request.
-      var laterAuthToken = await auth.getAuthToken();
+      var laterAuthToken = auth.getAuthToken();
       expect(laterAuthToken, isNot(initialAuthToken));
       expect(laterAuthToken, isNotEmpty);
     },
@@ -126,7 +126,7 @@ void main() {
         port: 5556,
         isSecure: true,
       );
-      var alice = await EthPrivateKey.fromHex("... private key ...").asSigner();
+      var alice = EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(alice.address, api);
       var decrypted = await auth.authenticateWithCredentials(alice);
       debugPrint("decrypted $decrypted");
@@ -139,8 +139,8 @@ void main() {
       var pre = decrypted.preKeys.isNotEmpty
           ? decrypted.preKeys.first.address.hexEip55
           : "(none)";
-      var preSigner = (await decrypted.v1.preKeys.first.publicKey
-              .recoverIdentitySignerPublicKey())
+      var preSigner = decrypted.v1.preKeys.first.publicKey
+          .recoverIdentitySignerPublicKey()
           .toEthereumAddress()
           .hexEip55;
       debugPrint("wallet $wallet");

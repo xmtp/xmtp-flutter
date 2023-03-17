@@ -3,6 +3,120 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
+class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _topicMeta = const VerificationMeta('topic');
+  @override
+  late final GeneratedColumn<String> topic = GeneratedColumn<String>(
+      'topic', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _versionMeta =
+      const VerificationMeta('version');
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+      'version', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _sentAtMeta = const VerificationMeta('sentAt');
+  @override
+  late final GeneratedColumn<int> sentAt = GeneratedColumn<int>(
+      'sent_at', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _senderMeta = const VerificationMeta('sender');
+  @override
+  late final GeneratedColumn<String> sender = GeneratedColumn<String>(
+      'sender', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _encodedMeta =
+      const VerificationMeta('encoded');
+  @override
+  late final GeneratedColumn<Uint8List> encoded = GeneratedColumn<Uint8List>(
+      'encoded', aliasedName, false,
+      type: DriftSqlType.blob, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, topic, version, sentAt, sender, encoded];
+  @override
+  String get aliasedName => _alias ?? 'messages';
+  @override
+  String get actualTableName => 'messages';
+  @override
+  VerificationContext validateIntegrity(Insertable<Message> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('topic')) {
+      context.handle(
+          _topicMeta, topic.isAcceptableOrUnknown(data['topic']!, _topicMeta));
+    } else if (isInserting) {
+      context.missing(_topicMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(_versionMeta,
+          version.isAcceptableOrUnknown(data['version']!, _versionMeta));
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('sent_at')) {
+      context.handle(_sentAtMeta,
+          sentAt.isAcceptableOrUnknown(data['sent_at']!, _sentAtMeta));
+    } else if (isInserting) {
+      context.missing(_sentAtMeta);
+    }
+    if (data.containsKey('sender')) {
+      context.handle(_senderMeta,
+          sender.isAcceptableOrUnknown(data['sender']!, _senderMeta));
+    } else if (isInserting) {
+      context.missing(_senderMeta);
+    }
+    if (data.containsKey('encoded')) {
+      context.handle(_encodedMeta,
+          encoded.isAcceptableOrUnknown(data['encoded']!, _encodedMeta));
+    } else if (isInserting) {
+      context.missing(_encodedMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Message map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Message(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      topic: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}topic'])!,
+      version: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}version'])!,
+      sentAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sent_at'])!,
+      sender: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sender'])!,
+      encoded: attachedDatabase.typeMapping
+          .read(DriftSqlType.blob, data['${effectivePrefix}encoded'])!,
+    );
+  }
+
+  @override
+  $MessagesTable createAlias(String alias) {
+    return $MessagesTable(attachedDatabase, alias);
+  }
+}
+
 class Message extends DataClass implements Insertable<Message> {
   final String id;
   final String topic;
@@ -209,16 +323,12 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   }
 }
 
-class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
+class $ConversationsTable extends Conversations
+    with TableInfo<$ConversationsTable, Conversation> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $MessagesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-      'id', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+  $ConversationsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _topicMeta = const VerificationMeta('topic');
   @override
   late final GeneratedColumn<String> topic = GeneratedColumn<String>(
@@ -230,39 +340,45 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
   late final GeneratedColumn<int> version = GeneratedColumn<int>(
       'version', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _sentAtMeta = const VerificationMeta('sentAt');
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
   @override
-  late final GeneratedColumn<int> sentAt = GeneratedColumn<int>(
-      'sent_at', aliasedName, false,
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+      'created_at', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _senderMeta = const VerificationMeta('sender');
+  static const VerificationMeta _inviteMeta = const VerificationMeta('invite');
   @override
-  late final GeneratedColumn<String> sender = GeneratedColumn<String>(
-      'sender', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _encodedMeta =
-      const VerificationMeta('encoded');
-  @override
-  late final GeneratedColumn<Uint8List> encoded = GeneratedColumn<Uint8List>(
-      'encoded', aliasedName, false,
+  late final GeneratedColumn<Uint8List> invite = GeneratedColumn<Uint8List>(
+      'invite', aliasedName, false,
       type: DriftSqlType.blob, requiredDuringInsert: true);
+  static const VerificationMeta _meMeta = const VerificationMeta('me');
+  @override
+  late final GeneratedColumn<String> me = GeneratedColumn<String>(
+      'me', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _peerMeta = const VerificationMeta('peer');
+  @override
+  late final GeneratedColumn<String> peer = GeneratedColumn<String>(
+      'peer', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastOpenedAtMeta =
+      const VerificationMeta('lastOpenedAt');
+  @override
+  late final GeneratedColumn<int> lastOpenedAt = GeneratedColumn<int>(
+      'last_opened_at', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, topic, version, sentAt, sender, encoded];
+      [topic, version, createdAt, invite, me, peer, lastOpenedAt];
   @override
-  String get aliasedName => _alias ?? 'messages';
+  String get aliasedName => _alias ?? 'conversations';
   @override
-  String get actualTableName => 'messages';
+  String get actualTableName => 'conversations';
   @override
-  VerificationContext validateIntegrity(Insertable<Message> instance,
+  VerificationContext validateIntegrity(Insertable<Conversation> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
     if (data.containsKey('topic')) {
       context.handle(
           _topicMeta, topic.isAcceptableOrUnknown(data['topic']!, _topicMeta));
@@ -275,51 +391,66 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     } else if (isInserting) {
       context.missing(_versionMeta);
     }
-    if (data.containsKey('sent_at')) {
-      context.handle(_sentAtMeta,
-          sentAt.isAcceptableOrUnknown(data['sent_at']!, _sentAtMeta));
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     } else if (isInserting) {
-      context.missing(_sentAtMeta);
+      context.missing(_createdAtMeta);
     }
-    if (data.containsKey('sender')) {
-      context.handle(_senderMeta,
-          sender.isAcceptableOrUnknown(data['sender']!, _senderMeta));
+    if (data.containsKey('invite')) {
+      context.handle(_inviteMeta,
+          invite.isAcceptableOrUnknown(data['invite']!, _inviteMeta));
     } else if (isInserting) {
-      context.missing(_senderMeta);
+      context.missing(_inviteMeta);
     }
-    if (data.containsKey('encoded')) {
-      context.handle(_encodedMeta,
-          encoded.isAcceptableOrUnknown(data['encoded']!, _encodedMeta));
+    if (data.containsKey('me')) {
+      context.handle(_meMeta, me.isAcceptableOrUnknown(data['me']!, _meMeta));
     } else if (isInserting) {
-      context.missing(_encodedMeta);
+      context.missing(_meMeta);
+    }
+    if (data.containsKey('peer')) {
+      context.handle(
+          _peerMeta, peer.isAcceptableOrUnknown(data['peer']!, _peerMeta));
+    } else if (isInserting) {
+      context.missing(_peerMeta);
+    }
+    if (data.containsKey('last_opened_at')) {
+      context.handle(
+          _lastOpenedAtMeta,
+          lastOpenedAt.isAcceptableOrUnknown(
+              data['last_opened_at']!, _lastOpenedAtMeta));
+    } else if (isInserting) {
+      context.missing(_lastOpenedAtMeta);
     }
     return context;
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {id};
+  Set<GeneratedColumn> get $primaryKey => {topic};
   @override
-  Message map(Map<String, dynamic> data, {String? tablePrefix}) {
+  Conversation map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Message(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+    return Conversation(
       topic: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}topic'])!,
       version: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}version'])!,
-      sentAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}sent_at'])!,
-      sender: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}sender'])!,
-      encoded: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}encoded'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
+      invite: attachedDatabase.typeMapping
+          .read(DriftSqlType.blob, data['${effectivePrefix}invite'])!,
+      me: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}me'])!,
+      peer: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}peer'])!,
+      lastOpenedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}last_opened_at'])!,
     );
   }
 
   @override
-  $MessagesTable createAlias(String alias) {
-    return $MessagesTable(attachedDatabase, alias);
+  $ConversationsTable createAlias(String alias) {
+    return $ConversationsTable(attachedDatabase, alias);
   }
 }
 
@@ -548,137 +679,6 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
           ..write('lastOpenedAt: $lastOpenedAt')
           ..write(')'))
         .toString();
-  }
-}
-
-class $ConversationsTable extends Conversations
-    with TableInfo<$ConversationsTable, Conversation> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $ConversationsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _topicMeta = const VerificationMeta('topic');
-  @override
-  late final GeneratedColumn<String> topic = GeneratedColumn<String>(
-      'topic', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _versionMeta =
-      const VerificationMeta('version');
-  @override
-  late final GeneratedColumn<int> version = GeneratedColumn<int>(
-      'version', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _createdAtMeta =
-      const VerificationMeta('createdAt');
-  @override
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-      'created_at', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _inviteMeta = const VerificationMeta('invite');
-  @override
-  late final GeneratedColumn<Uint8List> invite = GeneratedColumn<Uint8List>(
-      'invite', aliasedName, false,
-      type: DriftSqlType.blob, requiredDuringInsert: true);
-  static const VerificationMeta _meMeta = const VerificationMeta('me');
-  @override
-  late final GeneratedColumn<String> me = GeneratedColumn<String>(
-      'me', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _peerMeta = const VerificationMeta('peer');
-  @override
-  late final GeneratedColumn<String> peer = GeneratedColumn<String>(
-      'peer', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _lastOpenedAtMeta =
-      const VerificationMeta('lastOpenedAt');
-  @override
-  late final GeneratedColumn<int> lastOpenedAt = GeneratedColumn<int>(
-      'last_opened_at', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
-  @override
-  List<GeneratedColumn> get $columns =>
-      [topic, version, createdAt, invite, me, peer, lastOpenedAt];
-  @override
-  String get aliasedName => _alias ?? 'conversations';
-  @override
-  String get actualTableName => 'conversations';
-  @override
-  VerificationContext validateIntegrity(Insertable<Conversation> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('topic')) {
-      context.handle(
-          _topicMeta, topic.isAcceptableOrUnknown(data['topic']!, _topicMeta));
-    } else if (isInserting) {
-      context.missing(_topicMeta);
-    }
-    if (data.containsKey('version')) {
-      context.handle(_versionMeta,
-          version.isAcceptableOrUnknown(data['version']!, _versionMeta));
-    } else if (isInserting) {
-      context.missing(_versionMeta);
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(_createdAtMeta,
-          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    if (data.containsKey('invite')) {
-      context.handle(_inviteMeta,
-          invite.isAcceptableOrUnknown(data['invite']!, _inviteMeta));
-    } else if (isInserting) {
-      context.missing(_inviteMeta);
-    }
-    if (data.containsKey('me')) {
-      context.handle(_meMeta, me.isAcceptableOrUnknown(data['me']!, _meMeta));
-    } else if (isInserting) {
-      context.missing(_meMeta);
-    }
-    if (data.containsKey('peer')) {
-      context.handle(
-          _peerMeta, peer.isAcceptableOrUnknown(data['peer']!, _peerMeta));
-    } else if (isInserting) {
-      context.missing(_peerMeta);
-    }
-    if (data.containsKey('last_opened_at')) {
-      context.handle(
-          _lastOpenedAtMeta,
-          lastOpenedAt.isAcceptableOrUnknown(
-              data['last_opened_at']!, _lastOpenedAtMeta));
-    } else if (isInserting) {
-      context.missing(_lastOpenedAtMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {topic};
-  @override
-  Conversation map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Conversation(
-      topic: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}topic'])!,
-      version: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}version'])!,
-      createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
-      invite: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}invite'])!,
-      me: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}me'])!,
-      peer: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}peer'])!,
-      lastOpenedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}last_opened_at'])!,
-    );
-  }
-
-  @override
-  $ConversationsTable createAlias(String alias) {
-    return $ConversationsTable(attachedDatabase, alias);
   }
 }
 

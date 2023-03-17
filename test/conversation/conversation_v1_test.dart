@@ -21,10 +21,8 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "v1 messaging: intros, reading, writing, streaming",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
       var aliceAddress = aliceWallet.address.hex;
@@ -38,17 +36,16 @@ void main() {
       var aliceConvo = await alice.newConversation(bobAddress);
       var bobConvo = await bob.newConversation(aliceAddress);
 
-      var aliceMessages = await alice.listMessages(aliceConvo);
-      var bobMessages = await bob.listMessages(bobConvo);
+      var aliceMessages = await alice.listMessages([aliceConvo]);
+      var bobMessages = await bob.listMessages([bobConvo]);
 
       expect(aliceMessages.length, 0);
       expect(bobMessages.length, 0);
 
       // Bob starts listening to the stream and recording the transcript.
       var transcript = [];
-      var bobListening = bob
-          .streamMessages(bobConvo)
-          .listen((msg) => transcript.add('${msg.sender.hex}> ${msg.content}'));
+      var bobListening = bob.streamMessages([bobConvo]).listen(
+          (msg) => transcript.add('${msg.sender.hex}> ${msg.content}'));
 
       // Wait a second to allow contacts to propagate.
       await Future.delayed(const Duration(seconds: 1));
@@ -61,7 +58,7 @@ void main() {
       expect((await bob.listConversations()).length, 1);
 
       // And Bob see the message in the conversation.
-      bobMessages = await bob.listMessages(bobConvo);
+      bobMessages = await bob.listMessages([bobConvo]);
       expect(bobMessages.length, 1);
       expect(bobMessages[0].sender, aliceWallet.address);
       expect(bobMessages[0].content, "hello Bob, it's me Alice!");
@@ -69,7 +66,7 @@ void main() {
       // Bob replies
       await bob.sendMessage(bobConvo, "oh, hello Alice!");
 
-      aliceMessages = await alice.listMessages(aliceConvo);
+      aliceMessages = await alice.listMessages([aliceConvo]);
       expect(aliceMessages.length, 2);
       expect(aliceMessages[0].sender, bobWallet.address);
       expect(aliceMessages[0].content, "oh, hello Alice!");
@@ -96,8 +93,7 @@ void main() {
         isSecure: true,
         debugLogRequests: true,
       );
-      var wallet =
-          await EthPrivateKey.fromHex("... private key ...").asSigner();
+      var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(wallet.address, api);
       var contacts = ContactManager(api);
       var codecs = CodecRegistry()..registerCodec(TextCodec());
@@ -112,7 +108,7 @@ void main() {
       var conversations = await v1.listConversations();
       for (var convo in conversations) {
         debugPrint("dm w/ ${convo.peer}");
-        var dms = await v1.listMessages(convo);
+        var dms = await v1.listMessages([convo]);
         for (var j = 0; j < dms.length; ++j) {
           var dm = dms[j];
           debugPrint("${dm.sentAt} ${dm.sender.hexEip55}> ${dm.content}");

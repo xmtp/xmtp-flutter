@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../session.dart';
+import '../session/foreground_session.dart';
 import '../wallet.dart';
 
 /// A page prompting the user to login.
@@ -47,7 +47,7 @@ class LoginPage extends HookWidget {
                     if (wallet.wc.session.accounts.isEmpty) {
                       throw Exception('No accounts connected');
                     }
-                    await initNewSession(wallet.asSigner());
+                    await session.authorize(wallet.asSigner());
                     // ignore: use_build_context_synchronously
                     context.goNamed('home');
                   } catch (err) {
@@ -88,7 +88,7 @@ class _BottomQrModal extends HookWidget {
               ),
               _WalletIconButton(
                 name: "Rainbow",
-                logoId: "6089655c-cb7e-414b-f742-01fdc154be00",
+                logoId: "7a33d7f1-3d12-4b5c-f3ee-5cd83cb1b500",
                 makeUri: (uri) => "rainbow://wc?uri=$uri",
               ),
             ],

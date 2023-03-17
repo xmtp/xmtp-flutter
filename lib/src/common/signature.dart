@@ -23,9 +23,10 @@ class Signer {
 
 /// This adds a helper to [Credentials] to treat it as a [Signer].
 extension CredentialsToSigner on Credentials {
-  Future<Signer> asSigner() async => Signer.create(
-      (await extractAddress()).hexEip55,
-      (text) => signPersonalMessage(Uint8List.fromList(utf8.encode(text))));
+  Signer asSigner() => Signer.create(
+      address.hexEip55,
+      (text) async => signPersonalMessageToUint8List(
+          Uint8List.fromList(utf8.encode(text))));
 }
 
 /// This contains the XMTP signature texts and related utilities.
@@ -64,8 +65,8 @@ class SignatureSubject {
 
   /// These are the bytes that the identity key signs to prove that it
   /// is an authorized pre key for the wallet.
-  static Future<Uint8List> createPreKey(List<int> key) async =>
-      Uint8List.fromList(await sha256(key));
+  static Uint8List createPreKey(List<int> key) =>
+      Uint8List.fromList(sha256(key));
 
   static _bytesToHex(List<int> bytes) =>
       bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join("");
@@ -132,7 +133,7 @@ extension RecoverSignerPublicKey on xmtp.PublicKey {
   }
 
   /// This recovers the identity key that signed `this` preKey.
-  Future<List<int>> recoverIdentitySignerPublicKey() async {
+  List<int> recoverIdentitySignerPublicKey() {
     return _recoverIdentitySignerPublicKey(_gatherKeyBytes(), signature);
   }
 
@@ -151,7 +152,7 @@ extension RecoverSignerSignedPublicKey on xmtp.SignedPublicKey {
   }
 
   /// This recovers the identity key that signed `this` preKey.
-  Future<List<int>> recoverIdentitySignerPublicKey() async {
+  List<int> recoverIdentitySignerPublicKey() {
     return _recoverIdentitySignerPublicKey(keyBytes, signature);
   }
 }
@@ -170,11 +171,11 @@ List<int> _recoverWalletSignerPublicKey(
 }
 
 /// This recovers the identity key that signed the pre [keyBytes].
-Future<List<int>> _recoverIdentitySignerPublicKey(
+List<int> _recoverIdentitySignerPublicKey(
   List<int> keyBytes,
   xmtp.Signature signature,
-) async {
-  var digest = await SignatureSubject.createPreKey(keyBytes);
+) {
+  var digest = SignatureSubject.createPreKey(keyBytes);
   return ecRecover(digest, signature.toMsgSignature());
 }
 
@@ -236,6 +237,20 @@ extension SPKBundleToEthAddresses on xmtp.SignedPublicKeyBundle {
       identityKey.publicKeyBytes.toEthereumAddress();
 
   EthereumAddress get pre => preKey.publicKeyBytes.toEthereumAddress();
+
+  bool isValid() {
+    try {
+      // Make sure we can recover a wallet from the identity key signature.
+      identityKey.recoverWalletSignerPublicKey().toEthereumAddress();
+      // Make sure we can recover the identity from the pre key signature.
+      var identity = identityKey.publicKeyBytes.toEthereumAddress();
+      var recoveredIdentity =
+          preKey.recoverIdentitySignerPublicKey().toEthereumAddress();
+      return recoveredIdentity == identity;
+    } catch (ignore) {
+      return false;
+    }
+  }
 }
 
 /// This adds helper to grab the public key bytes from an [xmtp.SignedPublicKey]

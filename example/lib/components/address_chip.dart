@@ -17,7 +17,8 @@ class AddressChip extends HookWidget {
   @override
   Widget build(BuildContext context) {
     var me = useMe();
-    var name = useAddressName(address);
+    var hex = address?.hexEip55 ?? "";
+    var name = hex.isEmpty ? "" : "${hex.substring(0, 6)}…${hex.substring(38)}";
     return Chip(
       labelStyle: TextStyle(color: address == me ? Colors.deepPurple : null),
       backgroundColor: address == me ? Colors.deepPurple[50] : null,

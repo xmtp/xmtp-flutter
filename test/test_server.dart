@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:xmtp/src/common/api.dart';
 
 /// This contains configuration for the test server.
@@ -32,7 +33,7 @@ const skipUnlessTestServerEnabled =
     !testServerEnabled ? "This test depends on the test server" : false;
 
 /// This creates an [Api] configured to talk to the test server.
-Api createTestServerApi() {
+Api createTestServerApi({bool debugLogRequests = kDebugMode}) {
   if (!testServerEnabled) {
     throw StateError("XMTP server tests are not enabled.");
   }
@@ -40,6 +41,7 @@ Api createTestServerApi() {
     host: testServerHost,
     port: testServerPort,
     isSecure: testServerIsSecure,
+    debugLogRequests: debugLogRequests,
   );
 }
 

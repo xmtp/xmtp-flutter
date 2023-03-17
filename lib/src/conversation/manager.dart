@@ -79,25 +79,33 @@ class ConversationManager {
     ]);
   }
 
-  /// This lists the messages in [conversation].
+  /// This lists the messages in [conversations].
   Future<List<DecodedMessage>> listMessages(
-    Conversation conversation, [
+    Iterable<Conversation> conversations, [
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
-  ]) =>
-      conversation.version == xmtp.Message_Version.v1
-          ? _v1.listMessages(conversation, start, end, limit, sort)
-          : _v2.listMessages(conversation, start, end, limit, sort);
+  ]) async {
+    var cv1 = conversations.where((c) => c.version == xmtp.Message_Version.v1);
+    var cv2 = conversations.where((c) => c.version == xmtp.Message_Version.v2);
+    var messages = await Future.wait([
+      _v1.listMessages(cv1, start, end, limit, sort),
+      _v2.listMessages(cv2, start, end, limit, sort),
+    ]);
+    return messages.expand((m) => m).toList();
+  }
 
-  /// This exposes a stream of new messages in [conversation].
+  /// This exposes a stream of new messages in [conversations].
   Stream<DecodedMessage> streamMessages(
-    Conversation conversation,
+    Iterable<Conversation> conversations,
   ) =>
-      conversation.version == xmtp.Message_Version.v1
-          ? _v1.streamMessages(conversation)
-          : _v2.streamMessages(conversation);
+      StreamGroup.merge([
+        _v1.streamMessages(
+            conversations.where((c) => c.version == xmtp.Message_Version.v1)),
+        _v2.streamMessages(
+            conversations.where((c) => c.version == xmtp.Message_Version.v2)),
+      ]);
 
   /// This sends [content] as a message to [conversation].
   Future<DecodedMessage> sendMessage(
@@ -108,4 +116,13 @@ class ConversationManager {
       conversation.version == xmtp.Message_Version.v1
           ? _v1.sendMessage(conversation, content, contentType: contentType)
           : _v2.sendMessage(conversation, content, contentType: contentType);
+
+  /// This sends the [encoded] message to the [conversation].
+  Future<DecodedMessage> sendMessageEncoded(
+    Conversation conversation,
+    xmtp.EncodedContent encoded,
+  ) =>
+      conversation.version == xmtp.Message_Version.v1
+          ? _v1.sendMessageEncoded(conversation, encoded)
+          : _v2.sendMessageEncoded(conversation, encoded);
 }

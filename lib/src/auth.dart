@@ -73,9 +73,9 @@ class AuthManager {
   /// This returns an authentication token for the current user.
   /// If a previous auth token does not exist, or if it has expired,
   /// then this will use the [keys] to create a new one.
-  Future<String> getAuthToken() async {
+  String getAuthToken() {
     if (authToken.isEmpty || authTokenExpiresAt.isBefore(DateTime.now())) {
-      authToken = await keys.createAuthToken();
+      authToken = keys.createAuthToken();
       authTokenExpiresAt = DateTime.now().add(maxAuthTokenAge);
     }
     return authToken;
@@ -160,9 +160,7 @@ extension AuthCredentials on Signer {
     // Now we have the `identity` so we use it authorize a preKey.
     var pre = EthPrivateKey.createRandom(Random.secure());
     var unsignedPre = pre.toUnsignedPublicKey();
-    var preDigest = await SignatureSubject.createPreKey(
-      unsignedPre.writeToBuffer(),
-    );
+    var preDigest = SignatureSubject.createPreKey(unsignedPre.writeToBuffer());
     var preSig = sign(preDigest, identity.privateKey);
     var preKey = xmtp.PrivateKey(
       secp256k1: xmtp.PrivateKey_Secp256k1(bytes: pre.privateKey),
@@ -367,7 +365,7 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
   ///
   /// NOTE: this can only be called on v1 bundles.
   /// TODO: consider supporting V2 key bundles
-  Future<String> createAuthToken() async {
+  String createAuthToken() {
     if (whichVersion() != xmtp.PrivateKeyBundle_Version.v1) {
       throw UnsupportedError("only supported on xmtp.PrivateKeyBundle v1");
     }
@@ -382,7 +380,7 @@ extension AuthPrivateKeyBundle on xmtp.PrivateKeyBundle {
     var identityPrivateKey =
         bytesToUnsignedInt(Uint8List.fromList(v1.identityKey.secp256k1.bytes));
     var identity = EthPrivateKey.fromInt(identityPrivateKey);
-    var sig = await identity.signToSignature(authDataBytes);
+    var sig = identity.signToEcSignature(authDataBytes);
 
     var token = xmtp.Token(
       // The backend expects a signature of type ECDSA not WalletECDSA.

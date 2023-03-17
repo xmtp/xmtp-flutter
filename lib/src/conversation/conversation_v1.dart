@@ -94,11 +94,8 @@ class ConversationManagerV1 {
   Future<Conversation> _conversationFromIntro(xmtp.Message msg) async {
     var header = xmtp.MessageHeaderV1.fromBuffer(msg.v1.headerBytes);
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
-    var decoded = await _codecs.decode(encoded);
     var intro = await _createDecodedMessage(
       msg,
-      decoded.contentType,
-      decoded.content,
       encoded,
     );
     var createdAt = intro.sentAt;
@@ -116,14 +113,17 @@ class ConversationManagerV1 {
   }
 
   Future<List<DecodedMessage>> listMessages(
-    Conversation conversation, [
+    Iterable<Conversation> conversations, [
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
+    if (conversations.isEmpty) {
+      return [];
+    }
     var listing = await _api.client.query(xmtp.QueryRequest(
-      contentTopics: [conversation.topic],
+      contentTopics: conversations.map((c) => c.topic),
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
       pagingInfo: xmtp.PagingInfo(
@@ -136,20 +136,22 @@ class ConversationManagerV1 {
         .map((msg) => _decodedFromMessage(msg)));
   }
 
-  Stream<DecodedMessage> streamMessages(Conversation conversation) =>
-      _api.client
-          .subscribe(xmtp.SubscribeRequest(contentTopics: [conversation.topic]))
-          .map((e) => xmtp.Message.fromBuffer(e.message))
-          .asyncMap((msg) => _decodedFromMessage(msg));
+  Stream<DecodedMessage> streamMessages(Iterable<Conversation> conversations) {
+    if (conversations.isEmpty) {
+      return const Stream.empty();
+    }
+    return _api.client
+        .subscribe(xmtp.SubscribeRequest(
+            contentTopics: conversations.map((c) => c.topic)))
+        .map((e) => xmtp.Message.fromBuffer(e.message))
+        .asyncMap((msg) => _decodedFromMessage(msg));
+  }
 
   /// This decrypts and decodes the [xmtp.Message].
   Future<DecodedMessage> _decodedFromMessage(xmtp.Message msg) async {
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
-    var decoded = await _codecs.decode(encoded);
     return _createDecodedMessage(
       msg,
-      decoded.contentType,
-      decoded.content,
       encoded,
     );
   }
@@ -161,6 +163,13 @@ class ConversationManagerV1 {
   }) async {
     contentType ??= contentTypeText;
     var encoded = await _codecs.encode(DecodedContent(contentType, content));
+    return sendMessageEncoded(conversation, encoded);
+  }
+
+  Future<DecodedMessage> sendMessageEncoded(
+    Conversation conversation,
+    xmtp.EncodedContent encoded,
+  ) async {
     var peerContact = await _contacts.getUserContactV1(conversation.peer.hex);
     var encrypted = await encryptMessageV1(
       _auth.keys,
@@ -181,7 +190,7 @@ class ConversationManagerV1 {
     ]));
 
     // This returns a decoded edition for optimistic local updates.
-    return _createDecodedMessage(msg, contentType, content, encoded);
+    return _createDecodedMessage(msg, encoded);
   }
 
   Future<xmtp.PublishResponse> _sendIntros(
@@ -203,6 +212,29 @@ class ConversationManagerV1 {
         ),
       ),
     ));
+  }
+
+  /// This creates the [DecodedMessage] from the various parts.
+  Future<DecodedMessage> _createDecodedMessage(
+    xmtp.Message dm,
+    xmtp.EncodedContent encoded,
+  ) async {
+    var decoded = await _codecs.decode(encoded);
+    var id = bytesToHex(sha256(dm.writeToBuffer()));
+    var header = xmtp.MessageHeaderV1.fromBuffer(dm.v1.headerBytes);
+    var sender = header.sender.wallet;
+    var sentAt = header.timestamp.toDateTime();
+    var topic = Topic.directMessageV1(sender.hex, header.recipient.wallet.hex);
+    return DecodedMessage(
+      xmtp.Message_Version.v1,
+      sentAt,
+      sender,
+      encoded,
+      decoded.contentType,
+      decoded.content,
+      id: id,
+      topic: topic,
+    );
   }
 }
 
@@ -266,29 +298,5 @@ Future<xmtp.MessageV1> encryptMessageV1(
   return xmtp.MessageV1(
     headerBytes: headerBytes,
     ciphertext: ciphertext,
-  );
-}
-
-/// This creates the [DecodedMessage] from the various parts.
-Future<DecodedMessage> _createDecodedMessage(
-  xmtp.Message dm,
-  xmtp.ContentTypeId contentType,
-  Object content,
-  xmtp.EncodedContent encoded,
-) async {
-  var id = bytesToHex(await sha256(dm.writeToBuffer()));
-  var header = xmtp.MessageHeaderV1.fromBuffer(dm.v1.headerBytes);
-  var sender = header.sender.wallet;
-  var sentAt = header.timestamp.toDateTime();
-  var topic = Topic.directMessageV1(sender.hex, header.recipient.wallet.hex);
-  return DecodedMessage(
-    xmtp.Message_Version.v1,
-    sentAt,
-    sender,
-    encoded,
-    contentType,
-    content,
-    id: id,
-    topic: topic,
   );
 }

@@ -2,12 +2,14 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
 import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp/src/content/codec.dart';
+import 'package:xmtp/src/content/text_codec.dart';
 import 'package:xmtp/src/client.dart';
 
 import 'test_server.dart';
@@ -19,11 +21,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: listing, reading, writing, streaming",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -69,17 +69,25 @@ void main() {
       await bob.sendMessage(bobConvo, "oh, hello Alice!");
       await delayToPropagate();
 
+      // Bob sends an already-encoded message
+      await bob.sendMessageEncoded(
+          bobConvo, await TextCodec().encode("I have a note for you"));
+      await delayToPropagate();
+
       aliceMessages = await alice.listMessages(aliceConvo);
-      expect(aliceMessages.length, 2);
+      expect(aliceMessages.length, 3);
       expect(aliceMessages[0].sender, bobWallet.address);
-      expect(aliceMessages[0].content, "oh, hello Alice!");
-      expect(aliceMessages[1].sender, aliceWallet.address);
-      expect(aliceMessages[1].content, "hello Bob, it's me Alice!");
+      expect(aliceMessages[0].content, "I have a note for you");
+      expect(aliceMessages[1].sender, bobWallet.address);
+      expect(aliceMessages[1].content, "oh, hello Alice!");
+      expect(aliceMessages[2].sender, aliceWallet.address);
+      expect(aliceMessages[2].content, "hello Bob, it's me Alice!");
 
       await bobListening.cancel();
       expect(transcript, [
         "$aliceAddress> hello Bob, it's me Alice!",
         "$bobAddress> oh, hello Alice!",
+        "$bobAddress> I have a note for you",
       ]);
     },
   );
@@ -89,10 +97,8 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "contacts: can message only when their contact has been published",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceAddress = aliceWallet.address.hex;
       var bobAddress = bobWallet.address.hex;
       // At this point, neither Alice nor Bob has signed up yet.
@@ -130,11 +136,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "listing and sorting parameters",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -174,8 +178,7 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: self messages should be prevented",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       await delayToPropagate();
@@ -190,11 +193,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "messaging: distinguish conversations using conversationId",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);
       var bob = await Client.createFromWallet(bobApi, bobWallet);
@@ -204,20 +205,29 @@ void main() {
         bob.address.hex,
         conversationId: "https://example.com/alice-bob-discussing-work",
       );
-      await alice.sendMessage(work, "Bob, let's chat here about work.");
-      await alice.sendMessage(work, "Our quarterly report is due next week.");
-
       var play = await alice.newConversation(
         bob.address.hex,
         conversationId: "https://example.com/alice-bob-discussing-play",
       );
+      await delayToPropagate();
+
+      // Bob starts streaming both conversations
+      expect((await bob.listConversations()).length, 2);
+      var transcript = [];
+      var bobListening = bob.streamBatchMessages([work, play]).listen((msg) =>
+          transcript.add('${msg.topic} ${msg.sender.hex}> ${msg.content}'));
+
+      await alice.sendMessage(work, "Bob, let's chat here about work.");
+      await delayToPropagate();
+      await alice.sendMessage(work, "Our quarterly report is due next week.");
+      await delayToPropagate();
       await alice.sendMessage(play, "Bob, let's chat here about play.");
+      await delayToPropagate();
       await alice.sendMessage(play, "I don't want to work.");
+      await delayToPropagate();
       await alice.sendMessage(play, "I just want to bang on my drum all day.");
       await delayToPropagate();
 
-      var bobChats = await bob.listConversations();
-      expect(bobChats.length, 2);
       expect((await bob.listMessages(work)).map((m) => m.content).toList(), [
         "Our quarterly report is due next week.",
         "Bob, let's chat here about work.",
@@ -227,6 +237,15 @@ void main() {
         "I don't want to work.",
         "Bob, let's chat here about play.",
       ]);
+      expect((await bob.listBatchMessages([work, play])).length, 5);
+      await bobListening.cancel();
+      expect(transcript, [
+        "${work.topic} ${alice.address.hex}> Bob, let's chat here about work.",
+        "${work.topic} ${alice.address.hex}> Our quarterly report is due next week.",
+        "${play.topic} ${alice.address.hex}> Bob, let's chat here about play.",
+        "${play.topic} ${alice.address.hex}> I don't want to work.",
+        "${play.topic} ${alice.address.hex}> I just want to bang on my drum all day.",
+      ]);
     },
   );
 
@@ -235,11 +254,9 @@ void main() {
     skip: skipUnlessTestServerEnabled,
     "codecs: using a custom codec for integers",
     () async {
-      var aliceWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
-      var bobWallet =
-          await EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobApi = createTestServerApi();
       var alice = await Client.createFromWallet(
         aliceApi,
@@ -286,8 +303,7 @@ void main() {
       // Setup the API client.
       var api =
           Api.create(host: 'dev.xmtp.network', port: 5556, isSecure: true);
-      var wallet =
-          await EthPrivateKey.fromHex("... private key ...").asSigner();
+      var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var client = await Client.createFromWallet(api, wallet);
       var conversations = await client.listConversations();
       for (var convo in conversations) {
@@ -297,6 +313,47 @@ void main() {
         for (var msg in messages) {
           debugPrint(' ${msg.sentAt} ${msg.sender}> ${msg.content}');
         }
+      }
+    },
+  );
+
+  // This creates a user and sends them lots of messages from other users.
+  // This aims to be useful for prepping an account to test performance.
+  test(
+    skip: "manual testing",
+    "messaging: send lots of messages to me",
+    () async {
+      // Starts this many conversations:
+      const conversationCount = 30;
+      // ... with this many messages in each:
+      const messagesPerCount = 5;
+
+      var recipientKey = EthPrivateKey.createRandom(Random.secure());
+      var recipientClient = await Client.createFromWallet(
+          createTestServerApi(), recipientKey.asSigner());
+      var recipient = recipientClient.address.hex;
+      debugPrint('sending messages to $recipient');
+      debugPrint(' private key: ${bytesToHex(recipientKey.privateKey)}');
+      for (var i = 0; i < conversationCount; ++i) {
+        var senderKey = EthPrivateKey.createRandom(Random.secure());
+        var senderWallet = senderKey.asSigner();
+        var senderApi = createTestServerApi(debugLogRequests: false);
+        var sender = await Client.createFromWallet(senderApi, senderWallet);
+        debugPrint('${i + 1}/$conversationCount: '
+            'sending $messagesPerCount from ${sender.address.hex}');
+        var convo = await sender.newConversation(recipient);
+        await Future.wait(Iterable.generate(
+          messagesPerCount,
+          (_) => sender.sendMessage(convo, """
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, 
+sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris 
+nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in 
+reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla 
+pariatur. Excepteur sint occaecat cupidatat non proident, sunt in 
+culpa qui officia deserunt mollit anim id est laborum.
+"""),
+        ));
       }
     },
   );
