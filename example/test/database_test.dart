@@ -1,6 +1,5 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xmtp/xmtp.dart' as xmtp;
 
 import 'package:example/database/database.dart' as db;
 
@@ -9,8 +8,7 @@ import 'test_data.dart';
 void main() {
   late db.Database database;
   setUp(() async {
-    var decoder = xmtp.CodecRegistry()..registerCodec(xmtp.TextCodec());
-    database = db.Database(decoder, NativeDatabase.memory());
+    database = db.Database(NativeDatabase.memory());
   });
   tearDown(() async {
     await database.close();

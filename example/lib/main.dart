@@ -3,12 +3,12 @@ import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import 'router.dart';
-import 'session.dart';
+import 'session/foreground_session.dart';
 
 void main() async {
   /// If they have saved credentials, initialize the session.
   /// If not they will be sent to the login page instead.
-  await loadSavedSession();
+  await session.loadSaved();
   _monitorTotalUnreadBadge();
   runApp(const XmtpApp());
 }
