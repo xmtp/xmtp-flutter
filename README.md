@@ -23,7 +23,8 @@ For a basic demonstration of the core concepts and capabilities of the `xmtp-flu
 
 ## Reference docs
 
-See the [xmtp library](https://pub.dev/documentation/xmtp/latest/xmtp/Client-class.html) for the Flutter client SDK reference documentation.
+> **View the reference**  
+> Access the [Dart client SDK reference documentation](https://pub.dev/documentation/xmtp/latest/xmtp/Client-class.html) on pub.dev.
 
 ## Install with Dart Package Manager
 
