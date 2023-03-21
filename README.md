@@ -18,9 +18,6 @@ To learn more about XMTP and get answers to frequently asked questions, see [FAQ
 
 For a basic demonstration of the core concepts and capabilities of the `xmtp-flutter` client SDK, see the [Example app project](https://github.com/xmtp/xmtp-flutter/tree/main/example).
 
-> **Important**  
-> The example app includes a demonstration of how you might approach caching, or offline storage. Be aware that the example app naively performs a full refresh very frequently, **which causes slowdowns**. The underlying `xmtp-flutter` client SDK itself has no performance issues. If you want to provide offline storage in your app, be sure to design your refresh strategies with app performance in mind. Future versions of the example app aim to make this aspect easier to manage.
-
 ## Reference docs
 
 > **View the reference**  
