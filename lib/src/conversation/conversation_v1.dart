@@ -113,17 +113,14 @@ class ConversationManagerV1 {
   }
 
   Future<List<DecodedMessage>> listMessages(
-    Iterable<Conversation> conversations, [
+    Conversation conversation, [
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
-    if (conversations.isEmpty) {
-      return [];
-    }
     var listing = await _api.client.query(xmtp.QueryRequest(
-      contentTopics: conversations.map((c) => c.topic),
+      contentTopics: [conversation.topic],
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
       pagingInfo: xmtp.PagingInfo(

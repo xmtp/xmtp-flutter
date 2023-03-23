@@ -197,18 +197,14 @@ class ConversationManagerV2 {
 
   /// This lists the current messages in the [conversations]
   Future<List<DecodedMessage>> listMessages(
-    Iterable<Conversation> conversations, [
+    Conversation conversation, [
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
-    if (conversations.isEmpty) {
-      return [];
-    }
-    var convoByTopic = {for (var c in conversations) c.topic: c};
     var listing = await api.client.query(xmtp.QueryRequest(
-      contentTopics: conversations.map((c) => c.topic),
+      contentTopics: [conversation.topic],
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
       pagingInfo: xmtp.PagingInfo(
@@ -217,9 +213,8 @@ class ConversationManagerV2 {
       ),
     ));
     var messages = await Future.wait(listing.envelopes
-        .where((e) => convoByTopic.containsKey(e.contentTopic))
         .map((e) => _decodedFromMessage(
-              convoByTopic[e.contentTopic]!,
+              conversation,
               xmtp.Message.fromBuffer(e.message),
             )));
     // Remove nulls (which are discarded bad envelopes).

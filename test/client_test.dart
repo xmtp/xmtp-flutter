@@ -237,15 +237,6 @@ void main() {
         "I don't want to work.",
         "Bob, let's chat here about play.",
       ]);
-      expect((await bob.listBatchMessages([work, play])).length, 5);
-      await bobListening.cancel();
-      expect(transcript, [
-        "${work.topic} ${alice.address.hex}> Bob, let's chat here about work.",
-        "${work.topic} ${alice.address.hex}> Our quarterly report is due next week.",
-        "${play.topic} ${alice.address.hex}> Bob, let's chat here about play.",
-        "${play.topic} ${alice.address.hex}> I don't want to work.",
-        "${play.topic} ${alice.address.hex}> I just want to bang on my drum all day.",
-      ]);
     },
   );
 

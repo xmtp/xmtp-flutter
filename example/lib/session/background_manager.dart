@@ -114,8 +114,8 @@ class BackgroundManager {
         // TODO: do this in the query ^
         .where((c) => topicSet.contains(c.topic));
     return _refreshMessages(
-      conversations,
-      since: since,
+        conversations,
+        since: since,
     );
   }
 
@@ -123,12 +123,16 @@ class BackgroundManager {
     Iterable<xmtp.Conversation> conversations, {
     DateTime? since,
   }) async {
-    var messages = await _client.listBatchMessages(
-      conversations,
-      start: since,
-    );
-    await _db.saveMessages(messages);
-    return messages.length;
+    var messagesLength = 0;
+    for (var conversation in conversations) {
+      var messages = await _client.listMessages(
+        conversation,
+        start: since,
+      );
+      await _db.saveMessages(messages);
+      messagesLength += messages.length;
+    }
+    return messagesLength;
   }
 
   /// Refreshes the list of all conversations from the remote API.

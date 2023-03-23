@@ -81,19 +81,19 @@ class ConversationManager {
 
   /// This lists the messages in [conversations].
   Future<List<DecodedMessage>> listMessages(
-    Iterable<Conversation> conversations, [
+    Conversation conversation, [
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
-    var cv1 = conversations.where((c) => c.version == xmtp.Message_Version.v1);
-    var cv2 = conversations.where((c) => c.version == xmtp.Message_Version.v2);
-    var messages = await Future.wait([
-      _v1.listMessages(cv1, start, end, limit, sort),
-      _v2.listMessages(cv2, start, end, limit, sort),
-    ]);
-    return messages.expand((m) => m).toList();
+    if (conversation.version == xmtp.Message_Version.v1) {
+      return await _v1.listMessages(conversation, start, end, limit, sort);
+    }
+    if (conversation.version == xmtp.Message_Version.v2) {
+      return await _v2.listMessages(conversation, start, end, limit, sort);
+    }
+    return [];
   }
 
   /// This exposes a stream of new messages in [conversations].
