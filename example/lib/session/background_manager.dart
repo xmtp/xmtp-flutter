@@ -114,8 +114,8 @@ class BackgroundManager {
         // TODO: do this in the query ^
         .where((c) => topicSet.contains(c.topic));
     return _refreshMessages(
-        conversations,
-        since: since,
+      conversations,
+      since: since,
     );
   }
 
