@@ -18,7 +18,7 @@ dependencies:
   pointycastle: ^3.6.2
   quiver: ^3.2.1
   web3dart: ^2.6.1
-  xmtp_proto: ^0.0.1-development
+  xmtp_proto: ^3.23.0
 
 dev_dependencies:
   flutter_test:

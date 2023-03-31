@@ -207,16 +207,20 @@ class ConversationManagerV2 {
       return [];
     }
     var convoByTopic = {for (var c in conversations) c.topic: c};
-    var listing = await api.client.query(xmtp.QueryRequest(
-      contentTopics: conversations.map((c) => c.topic),
-      startTimeNs: start?.toNs64(),
-      endTimeNs: end?.toNs64(),
-      pagingInfo: xmtp.PagingInfo(
-        limit: limit,
-        direction: sort,
-      ),
-    ));
-    var messages = await Future.wait(listing.envelopes
+    var requests = conversations.map((c) => xmtp.QueryRequest(
+          contentTopics: [c.topic], // Limit one topic per query
+          startTimeNs: start?.toNs64(),
+          endTimeNs: end?.toNs64(),
+          pagingInfo: xmtp.PagingInfo(
+            limit: limit,
+            direction: sort,
+          ),
+        ));
+    var listing =
+        await api.client.batchQuery(xmtp.BatchQueryRequest(requests: requests));
+    var messages = await Future.wait(listing.responses
+        .expand((response) => response.envelopes)
+        .toList()
         .where((e) => convoByTopic.containsKey(e.contentTopic))
         .map((e) => _decodedFromMessage(
               convoByTopic[e.contentTopic]!,
