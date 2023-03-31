@@ -135,6 +135,7 @@ class ConversationManagerV1 {
         .batchQuery(xmtp.BatchQueryRequest(requests: requests));
     return Future.wait(listing.responses
         .expand((response) => response.envelopes).toList()
+        .sorted((e1, e2) => e2.timestampNs.compareTo(e1.timestampNs))
         .map((e) => xmtp.Message.fromBuffer(e.message))
         .map((msg) => _decodedFromMessage(msg)));
   }

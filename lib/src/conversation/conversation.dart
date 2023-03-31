@@ -62,3 +62,8 @@ class Conversation {
     return 'Conversation{version:$version me:$me peer:$peer topic:$topic}';
   }
 }
+
+/// Sort and return the sorted list inline
+extension ListSorted<T> on List<T> {
+  List<T> sorted(int Function(T a, T b) compare) => [...this]..sort(compare);
+}
