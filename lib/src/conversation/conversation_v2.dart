@@ -221,7 +221,9 @@ class ConversationManagerV2 {
     var messages = await Future.wait(listing.responses
         .expand((response) => response.envelopes)
         .toList()
-        .sorted((e1, e2) => e2.timestampNs.compareTo(e1.timestampNs))
+        .sorted((e1, e2) => sort == xmtp.SortDirection.SORT_DIRECTION_ASCENDING
+            ? e1.timestampNs.compareTo(e2.timestampNs)
+            : e2.timestampNs.compareTo(e1.timestampNs))
         .where((e) => convoByTopic.containsKey(e.contentTopic))
         .map((e) => _decodedFromMessage(
               convoByTopic[e.contentTopic]!,
