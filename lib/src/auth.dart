@@ -25,15 +25,11 @@ class AuthManager {
   late xmtp.PrivateKeyBundle keys;
 
   String authToken = "";
-  DateTime authTokenExpiresAt = DateTime(0);
-  final Duration maxAuthTokenAge;
 
   AuthManager(
     this._address,
-    this._api, {
-    // Note: true max is 1 hour. But we give ourselves some elbow room.
-    this.maxAuthTokenAge = const Duration(minutes: 59),
-  });
+    this._api,
+  );
 
   /// This authenticates using [keys] acquired from network storage
   /// encrypted using the [wallet].
@@ -74,10 +70,8 @@ class AuthManager {
   /// If a previous auth token does not exist, or if it has expired,
   /// then this will use the [keys] to create a new one.
   String getAuthToken() {
-    if (authToken.isEmpty || authTokenExpiresAt.isBefore(DateTime.now())) {
-      authToken = keys.createAuthToken();
-      authTokenExpiresAt = DateTime.now().add(maxAuthTokenAge);
-    }
+    authToken = keys.createAuthToken();
+    
     return authToken;
   }
 
