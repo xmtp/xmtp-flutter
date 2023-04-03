@@ -1,8 +1,8 @@
-name: Release
+name: Release dry run
 on:
   push:
     branches:
-      - main
+      - ea/add-release-action
 jobs:
   dart:
     name: Release (dart)
@@ -18,5 +18,18 @@ jobs:
       - run: flutter test --dart-define=TEST_SERVER_ENABLED=true
       - run: docker-compose -p xmtp -f "tool/local-node/docker-compose.yml" down
         if: always()
+#      - name: Set release version
+#        run: |
+#          TAG=`echo ${GITHUB_REF#refs/*/}`
+#          echo "GIT_TAG=${TAG#v}" >> $GITHUB_ENV
+      - name: Set release version
+        run: |
+          echo "GIT_TAG=0.0.3" >> $GITHUB_ENV
+      - name: Prepublish
+        env:
+          RELEASE_VERSION: ${{ env.GIT_TAG }}
+        run: |
+          sed -i "s/version: 0.0.0/version: $RELEASE_VERSION/" ./pubspec.yaml
+      - name: Verify pubspec
+        run: cat ./pubspec.yaml
       - run: dart pub publish --dry-run
-      # TODO: drop "--dry-run" to auto-publish to pub.dev
