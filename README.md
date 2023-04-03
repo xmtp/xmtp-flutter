@@ -306,3 +306,15 @@ Here are some best practices for when to use each environment:
 The `production` network is configured to store messages indefinitely.
 XMTP may occasionally delete messages and keys from the `dev` network, and will provide
 advance notice in the [XMTP Discord community](https://discord.gg/xmtp).
+
+## Publish a new version to pub.dev
+
+1. Determine the next version number based on the [current published version](https://pub.dev/packages/xmtp) in `major.minor.patch` format.
+2. Update [CHANGELOG.md](https://github.com/xmtp/xmtp-flutter/blob/main/CHANGELOG.md) to include release notes for the new version number and merge the update into the `main` branch via a Pull Request.
+3. Once the CHANGELOG Pull Request is merged, run the following commands on the `main` branch replacing `{VERSION_NUMBER}` with the same version added to `CHANGELOG.md` in Step 2.
+```bash
+git tag -a v{VERSION_NUMBER} -m "xmtp release v{VERSION_NUMBER}"
+git push origin v{VERSION_NUMBER}
+```
+4. Watch the [GitHub Actions](https://github.com/xmtp/xmtp-flutter/actions) and ensure the `Release` Action succeeds confirming the package has been published.
+5. Ensure the new version is up to date at https://pub.dev/packages/xmtp.
