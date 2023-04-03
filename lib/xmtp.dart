@@ -11,4 +11,4 @@ export 'src/content/decoded.dart' show DecodedContent, DecodedMessage;
 export 'src/content/codec.dart' show Codec;
 export 'src/content/codec_registry.dart' show CodecRegistry;
 export 'src/content/text_codec.dart' show contentTypeText, TextCodec;
-export 'package:xmtp_proto/xmtp_proto.dart';
+export 'package:xmtp_proto/xmtp_proto.dart' hide DecodedMessage;

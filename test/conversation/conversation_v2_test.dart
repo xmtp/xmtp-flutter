@@ -26,15 +26,20 @@ void main() {
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var charlieWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
+      var charlie = await _createLocalManager(charlieWallet);
       var aliceAddress = aliceWallet.address.hex;
       var bobAddress = bobWallet.address.hex;
+      var charlieAddress = charlieWallet.address.hex;
 
       var aliceChats = await alice.listConversations();
       var bobChats = await bob.listConversations();
+      var charlieChats = await charlie.listConversations();
       expect(aliceChats.length, 0);
       expect(bobChats.length, 0);
+      expect(charlieChats.length, 0);
 
       // Alice initiates the conversation (sending off the invites)
       var aliceConvo = await alice.newConversation(
@@ -54,6 +59,16 @@ void main() {
       // They see each other as the recipients.
       expect(aliceConvo.peer, bobWallet.address);
       expect(bobConvo.peer, aliceWallet.address);
+
+      // Alice initiates another conversation (sending off the invites)
+      var charlieConvo = await alice.newConversation(
+        charlieAddress,
+        xmtp.InvitationV1_Context(
+          conversationId: "example.com/alice-and-charlie",
+          metadata: {"title": "Alice & Charlie"},
+        ),
+      );
+      await delayToPropagate();
 
       // Bob starts listening to the stream and recording the transcript.
       var transcript = [];
@@ -80,6 +95,19 @@ void main() {
       expect(aliceMessages[0].content, "oh, hello Alice!");
       expect(aliceMessages[1].sender, aliceWallet.address);
       expect(aliceMessages[1].content, "hello Bob, it's me Alice!");
+
+      // Charlie sends a message to Alice
+      await charlie.sendMessage(charlieConvo, "hey Alice, it's Charlie");
+      await delayToPropagate();
+
+      var bobAndCharlieMessages = await alice.listMessages([bobConvo, charlieConvo]);
+      expect(bobAndCharlieMessages.length, 3);
+      expect(bobAndCharlieMessages[0].sender, charlieWallet.address);
+      expect(bobAndCharlieMessages[0].content, "hey Alice, it's Charlie");
+      expect(bobAndCharlieMessages[1].sender, bobWallet.address);
+      expect(bobAndCharlieMessages[1].content, "oh, hello Alice!");
+      expect(bobAndCharlieMessages[2].sender, aliceWallet.address);
+      expect(bobAndCharlieMessages[2].content, "hello Bob, it's me Alice!");
 
       await bobListening.cancel();
       expect(transcript, [

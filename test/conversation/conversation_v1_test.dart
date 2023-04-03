@@ -23,8 +23,11 @@ void main() {
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var charlieWallet =
+          EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
+      var charlie = await _createLocalManager(charlieWallet);
       var aliceAddress = aliceWallet.address.hex;
       var bobAddress = bobWallet.address.hex;
 
@@ -35,12 +38,16 @@ void main() {
 
       var aliceConvo = await alice.newConversation(bobAddress);
       var bobConvo = await bob.newConversation(aliceAddress);
+      var charlieConvo = await charlie.newConversation(aliceAddress);
 
       var aliceMessages = await alice.listMessages([aliceConvo]);
       var bobMessages = await bob.listMessages([bobConvo]);
+      var charlieAndBobMessages =
+          await alice.listMessages([bobConvo, charlieConvo]);
 
       expect(aliceMessages.length, 0);
       expect(bobMessages.length, 0);
+      expect(charlieAndBobMessages.length, 0);
 
       // Bob starts listening to the stream and recording the transcript.
       var transcript = [];
@@ -72,6 +79,19 @@ void main() {
       expect(aliceMessages[0].content, "oh, hello Alice!");
       expect(aliceMessages[1].sender, aliceWallet.address);
       expect(aliceMessages[1].content, "hello Bob, it's me Alice!");
+
+      // Charlie sends a message to Alice.
+      await charlie.sendMessage(charlieConvo, "hey Alice, it's Charlie");
+
+      charlieAndBobMessages =
+          await alice.listMessages([bobConvo, charlieConvo]);
+      expect(charlieAndBobMessages.length, 3);
+      expect(charlieAndBobMessages[0].sender, charlieWallet.address);
+      expect(charlieAndBobMessages[0].content, "hey Alice, it's Charlie");
+      expect(charlieAndBobMessages[1].sender, bobWallet.address);
+      expect(charlieAndBobMessages[1].content, "oh, hello Alice!");
+      expect(charlieAndBobMessages[2].sender, aliceWallet.address);
+      expect(charlieAndBobMessages[2].content, "hello Bob, it's me Alice!");
 
       await bobListening.cancel();
       expect(transcript, [

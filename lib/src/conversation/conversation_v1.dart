@@ -122,16 +122,23 @@ class ConversationManagerV1 {
     if (conversations.isEmpty) {
       return [];
     }
-    var listing = await _api.client.query(xmtp.QueryRequest(
-      contentTopics: conversations.map((c) => c.topic),
-      startTimeNs: start?.toNs64(),
-      endTimeNs: end?.toNs64(),
-      pagingInfo: xmtp.PagingInfo(
-        limit: limit,
-        direction: sort,
-      ),
-    ));
-    return Future.wait(listing.envelopes
+    var requests = conversations.map((c) => xmtp.QueryRequest(
+          contentTopics: [c.topic], // Limit one topic per query
+          startTimeNs: start?.toNs64(),
+          endTimeNs: end?.toNs64(),
+          pagingInfo: xmtp.PagingInfo(
+            limit: limit,
+            direction: sort,
+          ),
+        ));
+    var listing = await _api.client
+        .batchQuery(xmtp.BatchQueryRequest(requests: requests));
+    return Future.wait(listing.responses
+        .expand((response) => response.envelopes)
+        .toList()
+        .sorted((e1, e2) => sort == xmtp.SortDirection.SORT_DIRECTION_ASCENDING
+            ? e1.timestampNs.compareTo(e2.timestampNs)
+            : e2.timestampNs.compareTo(e1.timestampNs))
         .map((e) => xmtp.Message.fromBuffer(e.message))
         .map((msg) => _decodedFromMessage(msg)));
   }
