@@ -2,11 +2,9 @@
 name: Release
 on:
   push:
-    branches:
-      - ea/fix-publish-auth
-#    tags:
-#    # must align with the tag-pattern configured on pub.dev
-#    - 'v[0-9]+.[0-9]+.[0-9]+*' # tag-pattern on pub.dev: 'v'
+    tags:
+    # must align with the tag-pattern configured on pub.dev
+    - 'v[0-9]+.[0-9]+.[0-9]+*' # tag-pattern on pub.dev: 'v'
 jobs:
   dart:
     name: Release (dart)
@@ -37,4 +35,4 @@ jobs:
           sed -i "s/version: 0.0.0/version: $RELEASE_VERSION/" ./pubspec.yaml
       - name: Verify pubspec
         run: cat ./pubspec.yaml
-      - run: dart pub publish --dry-run
+      - run: dart pub publish --force
