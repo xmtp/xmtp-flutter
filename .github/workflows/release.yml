@@ -2,15 +2,21 @@
 name: Release
 on:
   push:
-    tags:
-    # must align with the tag-pattern configured on pub.dev
-    - 'v[0-9]+.[0-9]+.[0-9]+*' # tag-pattern on pub.dev: 'v'
+    branches:
+      - ea/fix-publish-auth
+#    tags:
+#    # must align with the tag-pattern configured on pub.dev
+#    - 'v[0-9]+.[0-9]+.[0-9]+*' # tag-pattern on pub.dev: 'v'
 jobs:
   dart:
     name: Release (dart)
+    permissions:
+      id-token: write # This is required for requesting the JWT
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      # Setup Dart SDK with JWT token https://github.com/dart-lang/setup-dart/blob/77b84bec90e9a0d07f68a3cedd3651ba9e606a12/.github/workflows/publish.yml#L33
+      - uses: dart-lang/setup-dart@a57a6c04cf7d4840e88432aad6281d1e125f0d46
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.7.6'
@@ -31,4 +37,4 @@ jobs:
           sed -i "s/version: 0.0.0/version: $RELEASE_VERSION/" ./pubspec.yaml
       - name: Verify pubspec
         run: cat ./pubspec.yaml
-      - run: dart pub publish --force
+      - run: dart pub publish --dry-run
