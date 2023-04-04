@@ -1,8 +1,10 @@
+# https://dart.dev/tools/pub/automated-publishing#publishing-packages-using-github-actions
 name: Release
 on:
   push:
-    branches:
-      - main
+    tags:
+    # must align with the tag-pattern configured on pub.dev
+    - 'v[0-9]+.[0-9]+.[0-9]+*' # tag-pattern on pub.dev: 'v'
 jobs:
   dart:
     name: Release (dart)
@@ -18,5 +20,15 @@ jobs:
       - run: flutter test --dart-define=TEST_SERVER_ENABLED=true
       - run: docker-compose -p xmtp -f "tool/local-node/docker-compose.yml" down
         if: always()
-      - run: dart pub publish --dry-run
-      # TODO: drop "--dry-run" to auto-publish to pub.dev
+      - name: Set release version
+        run: |
+          TAG=`echo ${GITHUB_REF#refs/*/}`
+          echo "GIT_TAG=${TAG#v}" >> $GITHUB_ENV
+      - name: Update version in pubspec
+        env:
+          RELEASE_VERSION: ${{ env.GIT_TAG }}
+        run: |
+          sed -i "s/version: 0.0.0/version: $RELEASE_VERSION/" ./pubspec.yaml
+      - name: Verify pubspec
+        run: cat ./pubspec.yaml
+      - run: dart pub publish --force
