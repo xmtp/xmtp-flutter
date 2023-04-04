@@ -8,9 +8,13 @@ on:
 jobs:
   dart:
     name: Release (dart)
+    permissions:
+      id-token: write # This is required for requesting the JWT
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      # Setup Dart SDK with JWT token https://github.com/dart-lang/setup-dart/blob/77b84bec90e9a0d07f68a3cedd3651ba9e606a12/.github/workflows/publish.yml#L33
+      - uses: dart-lang/setup-dart@a57a6c04cf7d4840e88432aad6281d1e125f0d46
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.7.6'
