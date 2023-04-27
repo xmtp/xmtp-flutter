@@ -226,13 +226,13 @@ xmtp.ContactBundle createContactBundleV1(xmtp.PrivateKeyBundle keys) {
       keyBundle: xmtp.PublicKeyBundle(
         identityKey: xmtp.PublicKey()
           ..mergeFromMessage(identityKey)
-          ..signature = identityKey.signature.toWalletEcdsa(),
+          ..signature = identityKey.signature.toEcdsa(),
         preKey: isAlreadyV1
             ? keys.v1.preKeys.first.publicKey
             : _toPublicKey(
                 keys.v2.preKeys.first.publicKey,
                 isSignedByWallet: false,
-              ),
+              )
       ),
     ),
   );

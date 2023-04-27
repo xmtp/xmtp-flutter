@@ -1,3 +1,7 @@
+## 1.0.0
+- General Availability release
+- Fix for publishing v1 contact bundle signatures
+
 ## 0.0.4
 - publish package with GitHub Actions
 - use batch query for listing messages
