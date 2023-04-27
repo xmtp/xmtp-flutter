@@ -232,7 +232,7 @@ xmtp.ContactBundle createContactBundleV1(xmtp.PrivateKeyBundle keys) {
             : _toPublicKey(
                 keys.v2.preKeys.first.publicKey,
                 isSignedByWallet: false,
-              )
+              ),
       ),
     ),
   );
