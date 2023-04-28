@@ -308,8 +308,10 @@ advance notice in the [XMTP Discord community](https://discord.gg/xmtp).
 ## Publish a new version to pub.dev
 
 1. Determine the next version number based on the [current published version](https://pub.dev/packages/xmtp) in `major.minor.patch` format.
-2. Update [CHANGELOG.md](https://github.com/xmtp/xmtp-flutter/blob/main/CHANGELOG.md) to include release notes for the new version number and merge the update into the `main` branch via a Pull Request.
-3. Once the CHANGELOG Pull Request is merged, run the following commands on the `main` branch replacing `{VERSION_NUMBER}` with the same version added to `CHANGELOG.md` in Step 2.
+2. Update the `sdkVersion`  in `common/api.dart` to use the new version.
+3. Update [CHANGELOG.md](https://github.com/xmtp/xmtp-flutter/blob/main/CHANGELOG.md) to include release notes for the new version number.
+4. Merge the updates from Steps 2 & 3 into the `main` branch via a Pull Request.
+5. Checkout the `main` branch, pull the latest changes & run the following commands replacing `{VERSION_NUMBER}` with the new version.
 ```bash
 git tag -a v{VERSION_NUMBER} -m "xmtp release v{VERSION_NUMBER}"
 git push origin v{VERSION_NUMBER}

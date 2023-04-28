@@ -170,7 +170,7 @@ void main() {
       expect(storedV1.wallet, alice.address);
       expect(storedV1.whichVersion(), xmtp.ContactBundle_Version.v1);
       expect(storedV1.v1.keyBundle.identityKey.signature.whichUnion(),
-          xmtp.Signature_Union.walletEcdsaCompact);
+          xmtp.Signature_Union.ecdsaCompact);
       expect(storedV1.v1.keyBundle.preKey.signature.whichUnion(),
           xmtp.Signature_Union.ecdsaCompact);
       expect(storedV2.wallet, alice.address);
