@@ -249,6 +249,38 @@ void main() {
     },
   );
 
+  test(
+    skip: skipUnlessTestServerEnabled,
+    timeout: const Timeout.factor(5), // TODO: consider turning off in CI
+    "messaging: batch requests should be partitioned to fit max batch size",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var aliceAddress = aliceWallet.address.hexEip55;
+
+      // Pretend a bunch of people have messaged alice.
+      const conversationCount = maxQueryRequestsPerBatch + 5;
+      await Future.wait(List.generate(conversationCount, (i) async {
+        var wallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+        var api = createTestServerApi(debugLogRequests: false);
+        var user = await Client.createFromWallet(api, wallet);
+        var convo = await user.newConversation(
+          aliceAddress,
+          conversationId: "example.com/batch-partition-test-convo-$i",
+        );
+        await user.sendMessage(convo, "I am number $i of $conversationCount");
+      }));
+      await delayToPropagate();
+
+      var convos = await alice.listConversations();
+      expect(convos.length, conversationCount);
+
+      var messages = await alice.listBatchMessages(convos);
+      expect(messages.length, conversationCount);
+    },
+  );
+
   // This uses a custom codec to send integers between two people.
   test(
     skip: skipUnlessTestServerEnabled,

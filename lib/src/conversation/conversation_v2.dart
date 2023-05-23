@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:quiver/check.dart';
+import 'package:quiver/iterables.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:web3dart/credentials.dart';
@@ -216,14 +217,15 @@ class ConversationManagerV2 {
             direction: sort,
           ),
         ));
-    var listing =
-        await api.client.batchQuery(xmtp.BatchQueryRequest(requests: requests));
-    var messages = await Future.wait(listing.responses
-        .expand((response) => response.envelopes)
-        .toList()
-        .sorted((e1, e2) => sort == xmtp.SortDirection.SORT_DIRECTION_ASCENDING
-            ? e1.timestampNs.compareTo(e2.timestampNs)
-            : e2.timestampNs.compareTo(e1.timestampNs))
+    // Batch up the requests to avoid requesting too many in one shot.
+    var batches = partition(requests, maxQueryRequestsPerBatch);
+    var compare = envelopeComparator(sort);
+    var results = await Future.wait(batches.map((batch) => api.client
+        .batchQuery(xmtp.BatchQueryRequest(requests: batch))
+        .then((res) => res.responses.expand((r) => r.envelopes))
+        .then((envs) => envs.toList().sorted(compare))));
+    var listing = merge(results, compare);
+    var messages = await Future.wait(listing
         .where((e) => convoByTopic.containsKey(e.contentTopic))
         .map((e) => _decodedFromMessage(
               convoByTopic[e.contentTopic]!,
