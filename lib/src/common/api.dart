@@ -8,6 +8,10 @@ const sdkVersion = '1.0.0';
 const clientVersion = "xmtp-flutter/$sdkVersion";
 // TODO: consider generating these ^ during build.
 
+/// The maximum number of requests permitted in a single batch call.
+/// The conversation managers use this to automatically partition calls.
+const maxQueryRequestsPerBatch = 50;
+
 /// This is an instance of the [xmtp.MessageApiClient] with some
 /// metadata helpers (e.g. for setting the authorization token).
 class Api {
@@ -78,6 +82,12 @@ class Api {
     return _channel.terminate();
   }
 }
+
+/// Creates a [Comparator] that implements the [sort] over [xmtp.Envelope].
+Comparator<xmtp.Envelope> envelopeComparator(xmtp.SortDirection? sort) =>
+    (e1, e2) => sort == xmtp.SortDirection.SORT_DIRECTION_ASCENDING
+        ? e1.timestampNs.compareTo(e2.timestampNs)
+        : e2.timestampNs.compareTo(e1.timestampNs);
 
 /// This controls the metadata that is attached to every API request.
 class _MetadataManager {

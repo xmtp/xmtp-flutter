@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:quiver/iterables.dart';
 import 'package:web3dart/credentials.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
@@ -131,14 +132,15 @@ class ConversationManagerV1 {
             direction: sort,
           ),
         ));
-    var listing = await _api.client
-        .batchQuery(xmtp.BatchQueryRequest(requests: requests));
-    return Future.wait(listing.responses
-        .expand((response) => response.envelopes)
-        .toList()
-        .sorted((e1, e2) => sort == xmtp.SortDirection.SORT_DIRECTION_ASCENDING
-            ? e1.timestampNs.compareTo(e2.timestampNs)
-            : e2.timestampNs.compareTo(e1.timestampNs))
+    // Batch up the requests to avoid requesting too many in one shot.
+    var batches = partition(requests, maxQueryRequestsPerBatch);
+    var compare = envelopeComparator(sort);
+    var results = await Future.wait(batches.map((batch) => _api.client
+        .batchQuery(xmtp.BatchQueryRequest(requests: batch))
+        .then((res) => res.responses.expand((r) => r.envelopes))
+        .then((envs) => envs.toList().sorted(compare))));
+    var listing = merge(results, compare);
+    return await Future.wait(listing
         .map((e) => xmtp.Message.fromBuffer(e.message))
         .map((msg) => _decodedFromMessage(msg)));
   }

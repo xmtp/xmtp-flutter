@@ -26,7 +26,8 @@ void main() {
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
-      var charlieWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var charlieWallet =
+          EthPrivateKey.createRandom(Random.secure()).asSigner();
       var alice = await _createLocalManager(aliceWallet);
       var bob = await _createLocalManager(bobWallet);
       var charlie = await _createLocalManager(charlieWallet);
@@ -100,7 +101,8 @@ void main() {
       await charlie.sendMessage(charlieConvo, "hey Alice, it's Charlie");
       await delayToPropagate();
 
-      var bobAndCharlieMessages = await alice.listMessages([bobConvo, charlieConvo]);
+      var bobAndCharlieMessages =
+          await alice.listMessages([bobConvo, charlieConvo]);
       expect(bobAndCharlieMessages.length, 3);
       expect(bobAndCharlieMessages[0].sender, charlieWallet.address);
       expect(bobAndCharlieMessages[0].content, "hey Alice, it's Charlie");
@@ -366,6 +368,37 @@ void main() {
     },
   );
 
+  test(
+    skip: skipUnlessTestServerEnabled,
+    timeout: const Timeout.factor(5), // TODO: consider turning off in CI
+    "v2 messaging: batch requests should be partitioned to fit max batch size",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var alice = await _createLocalManager(aliceWallet);
+      var aliceAddress = aliceWallet.address.hexEip55;
+
+      // Pretend a bunch of people have messaged alice.
+      const conversationCount = maxQueryRequestsPerBatch + 5;
+      await Future.wait(List.generate(conversationCount, (i) async {
+        var wallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+        var user = await _createLocalManager(wallet, debugLogRequests: false);
+        var convo = await user.newConversation(
+            aliceAddress,
+            xmtp.InvitationV1_Context(
+              conversationId: "example.com/batch-partition-test-convo-$i",
+            ));
+        await user.sendMessage(convo, "I am number $i of $conversationCount");
+      }));
+      await delayToPropagate();
+
+      var convos = await alice.listConversations();
+      expect(convos.length, conversationCount);
+
+      var messages = await alice.listMessages(convos);
+      expect(messages.length, conversationCount);
+    },
+  );
+
   // This connects to the dev network to test decrypting v2 messages
   // NOTE: it requires a private key
   test(
@@ -405,8 +438,11 @@ void main() {
 
 // helpers
 
-Future<ConversationManagerV2> _createLocalManager(Signer wallet) async {
-  var api = createTestServerApi();
+Future<ConversationManagerV2> _createLocalManager(
+  Signer wallet, {
+  bool debugLogRequests = kDebugMode,
+}) async {
+  var api = createTestServerApi(debugLogRequests: debugLogRequests);
   var auth = AuthManager(wallet.address, api);
   var codecs = CodecRegistry()..registerCodec(TextCodec());
   var contacts = ContactManager(api);
