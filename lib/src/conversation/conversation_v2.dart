@@ -170,11 +170,13 @@ class ConversationManagerV2 {
   }) async {
     contentType ??= contentTypeText;
     var encoded = await _codecs.encode(DecodedContent(contentType, content));
-    return sendMessageEncoded(conversation, encoded);
+    var sent = await sendMessageEncoded(conversation, encoded);
+    return sent!;
   }
 
   /// This sends the [encoded] message to the [conversation].
-  Future<DecodedMessage> sendMessageEncoded(
+  /// If it cannot be decoded then it still sends but this returns `null`.
+  Future<DecodedMessage?> sendMessageEncoded(
     Conversation conversation,
     xmtp.EncodedContent encoded,
   ) async {
@@ -193,7 +195,12 @@ class ConversationManagerV2 {
         message: dm.writeToBuffer(),
       ),
     ]));
-    return _createDecodedMessage(dm, signed);
+    try {
+      return await _createDecodedMessage(dm, signed);
+    } catch (err) {
+      debugPrint('unable to decode sent message');
+      return null;
+    }
   }
 
   /// This lists the current messages in the [conversations]
@@ -278,7 +285,12 @@ class ConversationManagerV2 {
       debugPrint('discarding message with bad signature');
       return null;
     }
-    return _createDecodedMessage(msg, signed);
+    try {
+      return await _createDecodedMessage(msg, signed);
+    } catch (err) {
+      debugPrint('discarding message that cannot be decoded');
+      return null;
+    }
   }
 
   /// This helper sends the [sealed] invite to [_me] and to [peer].

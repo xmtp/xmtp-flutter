@@ -118,7 +118,8 @@ class ConversationManager {
           : _v2.sendMessage(conversation, content, contentType: contentType);
 
   /// This sends the [encoded] message to the [conversation].
-  Future<DecodedMessage> sendMessageEncoded(
+  /// If it cannot be decoded then it still sends but this returns `null`.
+  Future<DecodedMessage?> sendMessageEncoded(
     Conversation conversation,
     xmtp.EncodedContent encoded,
   ) =>
