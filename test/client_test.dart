@@ -92,6 +92,53 @@ void main() {
     },
   );
 
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "codecs: discard messages from unsupported codecs without fallback text",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+      await delayToPropagate();
+
+      var chat = await alice.newConversation(
+        bob.address.hex,
+        conversationId: "https://example.com/alice-bob-chat",
+      );
+      await delayToPropagate();
+
+      var encoded1234 = await IntegerCodec().encode(1234);
+      expect(encoded1234.hasFallback(), false);
+
+      await alice.sendMessage(chat, "Hey! I'm about to send you an Integer");
+      await delayToPropagate();
+      await alice.sendMessageEncoded(chat, encoded1234);
+      await delayToPropagate();
+      await alice.sendMessage(chat, "You might see it?");
+      await delayToPropagate();
+
+      // Bob doesn't know about IntegerCodec (and it has no fallback)
+      // So he can't see the integer message.
+      expect((await bob.listMessages(chat)).map((m) => m.content).toList(), [
+        "You might see it?",
+        "Hey! I'm about to send you an Integer",
+      ]);
+
+      // But if we teach Bob about IntegerCodec
+      bob = await Client.createFromWallet(bobApi, bobWallet,
+          customCodecs: [IntegerCodec()]);
+      // Then he should see it
+      expect((await bob.listMessages(chat)).map((m) => m.content).toList(), [
+        "You might see it?",
+        1234,
+        "Hey! I'm about to send you an Integer",
+      ]);
+    },
+  );
+
   // This verifies client usage of published contacts.
   test(
     skip: skipUnlessTestServerEnabled,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:quiver/iterables.dart';
 import 'package:web3dart/credentials.dart';
 import 'package:web3dart/crypto.dart';
@@ -140,9 +141,11 @@ class ConversationManagerV1 {
         .then((res) => res.responses.expand((r) => r.envelopes))
         .then((envs) => envs.toList().sorted(compare))));
     var listing = merge(results, compare);
-    return await Future.wait(listing
+    var messages = await Future.wait(listing
         .map((e) => xmtp.Message.fromBuffer(e.message))
         .map((msg) => _decodedFromMessage(msg)));
+    // Remove nulls (which are discarded bad envelopes).
+    return messages.where((msg) => msg != null).map((msg) => msg!).toList();
   }
 
   Stream<DecodedMessage> streamMessages(Iterable<Conversation> conversations) {
@@ -153,16 +156,24 @@ class ConversationManagerV1 {
         .subscribe(xmtp.SubscribeRequest(
             contentTopics: conversations.map((c) => c.topic)))
         .map((e) => xmtp.Message.fromBuffer(e.message))
-        .asyncMap((msg) => _decodedFromMessage(msg));
+        .asyncMap((msg) => _decodedFromMessage(msg))
+        // Remove nulls (which are discarded bad envelopes).
+        .where((msg) => msg != null)
+        .map((msg) => msg!);
   }
 
   /// This decrypts and decodes the [xmtp.Message].
-  Future<DecodedMessage> _decodedFromMessage(xmtp.Message msg) async {
-    var encoded = await decryptMessageV1(msg.v1, _auth.keys);
-    return _createDecodedMessage(
-      msg,
-      encoded,
-    );
+  Future<DecodedMessage?> _decodedFromMessage(xmtp.Message msg) async {
+    try {
+      var encoded = await decryptMessageV1(msg.v1, _auth.keys);
+      return _createDecodedMessage(
+        msg,
+        encoded,
+      );
+    } catch (err) {
+      debugPrint('discarding message that cannot be decoded');
+      return null;
+    }
   }
 
   Future<DecodedMessage> sendMessage(
@@ -172,10 +183,11 @@ class ConversationManagerV1 {
   }) async {
     contentType ??= contentTypeText;
     var encoded = await _codecs.encode(DecodedContent(contentType, content));
-    return sendMessageEncoded(conversation, encoded);
+    var sent = await sendMessageEncoded(conversation, encoded);
+    return sent!;
   }
 
-  Future<DecodedMessage> sendMessageEncoded(
+  Future<DecodedMessage?> sendMessageEncoded(
     Conversation conversation,
     xmtp.EncodedContent encoded,
   ) async {
@@ -199,7 +211,12 @@ class ConversationManagerV1 {
     ]));
 
     // This returns a decoded edition for optimistic local updates.
-    return _createDecodedMessage(msg, encoded);
+    try {
+      return _createDecodedMessage(msg, encoded);
+    } catch (err) {
+      debugPrint('unable to decode sent message');
+      return null;
+    }
   }
 
   Future<xmtp.PublishResponse> _sendIntros(

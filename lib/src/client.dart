@@ -256,7 +256,8 @@ class Client implements Codec<DecodedContent> {
   /// This sends the already [encoded] message to the [conversation].
   /// This is identical to [sendMessage] but can be helpful when you
   /// have already encoded the message to send.
-  Future<DecodedMessage> sendMessageEncoded(
+  /// If it cannot be decoded then it still sends but this returns `null`.
+  Future<DecodedMessage?> sendMessageEncoded(
     Conversation conversation,
     xmtp.EncodedContent encoded,
   ) =>
