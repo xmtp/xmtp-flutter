@@ -235,9 +235,12 @@ void main() {
       var invalidInvite = await encryptInviteV1(
         alice.auth.keys,
         bobPeer.v2.keyBundle,
-        createInviteV1(xmtp.InvitationV1_Context(
-          conversationId: "example.com/not-valid-mismatched-timestamps",
-        )),
+        await createInviteV1(
+            alice.auth.keys,
+            bobPeer.v2.keyBundle,
+            xmtp.InvitationV1_Context(
+              conversationId: "example.com/not-valid-mismatched-timestamps",
+            )),
         badInviteSealedAt,
       );
       await alice.api.client.publish(xmtp.PublishRequest(envelopes: [
@@ -274,6 +277,82 @@ void main() {
       expect((await bob.listConversations()).length, 1);
       var bobConvo = (await bob.listConversations())[0];
       expect(bobConvo.conversationId, "example.com/valid");
+    },
+  );
+
+
+  test(
+    "v2 messaging: low-level deterministic invite creation",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceKeys = await aliceWallet.createIdentity(generateKeyPair());
+      var bobKeys = await bobWallet.createIdentity(generateKeyPair());
+      makeInvite(String conversationId) => createInviteV1(
+        aliceKeys,
+        createContactBundleV2(bobKeys).v2.keyBundle,
+        xmtp.InvitationV1_Context(conversationId: conversationId),
+      );
+
+      // Repeatedly making the same invite should use the same topic/keys
+      var original = await makeInvite("example.com/conversation-foo");
+      for (var i = 0; i < 10; ++i) {
+        var invite = await makeInvite("example.com/conversation-foo");
+        expect(original.topic, invite.topic);
+      }
+
+      // But when the conversationId changes then it use a new topic/keys
+      var invite = await makeInvite("example.com/conversation-bar");
+      expect(original.topic, isNot(invite.topic));
+    },
+  );
+
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "v2 messaging: generate deterministic topic/keyMaterial to avoid duplicates",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var alice = await _createLocalManager(aliceWallet);
+      var bob = await _createLocalManager(bobWallet);
+      var bobAddress = bobWallet.address.hex;
+      await delayToPropagate();
+
+      // First Alice invites Bob to the conversation
+      var c1 = await alice.newConversation(
+        bobAddress,
+        xmtp.InvitationV1_Context(
+          conversationId: "example.com/alice-and-bob",
+        ),
+      );
+      await alice.sendMessage(c1, "Hello Bob");
+
+      // Alice starts the same conversation again (same conversation ID).
+      var c2 = await alice.newConversation(
+        bobAddress,
+        xmtp.InvitationV1_Context(
+          conversationId: "example.com/alice-and-bob",
+        ),
+      );
+      await alice.sendMessage(c2, "And another one");
+
+      // Alice should see the same topic and keyMaterial for both conversations.
+      expect(c1.topic, c2.topic, reason: "the topic should be deterministic");
+      expect(
+        c1.invite.aes256GcmHkdfSha256.keyMaterial,
+        c2.invite.aes256GcmHkdfSha256.keyMaterial,
+        reason: "the keyMaterial should be deterministic",
+      );
+
+      // And Bob should only see the one conversation.
+      var bobConvos = await bob.listConversations();
+      expect(1, bobConvos.length);
+      expect(c1.topic, bobConvos[0].topic);
+
+      var bobMessages = await bob.listMessages(bobConvos);
+      expect(2, bobMessages.length);
+      expect("Hello Bob", bobMessages[1].content);
+      expect("And another one", bobMessages[0].content);
     },
   );
 
