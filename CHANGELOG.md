@@ -1,3 +1,8 @@
+## 1.1.0
+- feat: use deterministic topic/keyMaterial invite generation
+- fix: discard messages from unsupported codecs when they have no fallback
+- fix: partition batch calls to fit max size 
+
 ## 1.0.0
 - General Availability release
 - Fix for publishing v1 contact bundle signatures
