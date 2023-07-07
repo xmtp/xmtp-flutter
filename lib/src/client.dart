@@ -279,6 +279,33 @@ class Client implements Codec<DecodedContent> {
   Future<xmtp.EncodedContent> encode(DecodedContent decoded) =>
       _codecs.encode(decoded);
 
+  /// This decrypts a [Conversation] from an `envelope`.
+  ///
+  /// This decryption happens automatically when you `listConversations`.
+  /// But this method exists to enable out-of-band receipt of messages that
+  /// can then be decrypted (e.g. when receiving a push notification).
+  ///
+  /// It returns `null` when the conversation could not be decrypted.
+  @override
+  Future<Conversation?> decryptConversation(
+    xmtp.Envelope envelope,
+  ) =>
+      _conversations.decryptConversation(envelope);
+
+  /// This decrypts and decodes the `message` belonging to `conversation`.
+  ///
+  /// This decryption/decoding happens automatically when you `listMessages`.
+  /// But this method exists to enable out-of-band receipt of messages that
+  /// can then be decrypted (e.g. when receiving a push notification).
+  ///
+  /// It returns `null` when the message could not be decoded.
+  @override
+  Future<DecodedMessage?> decryptMessage(
+    Conversation conversation,
+    xmtp.Message message,
+  ) =>
+      _conversations.decryptMessage(conversation, message);
+
   /// This completes the implementation of the [Codec] interface.
   @override
   xmtp.ContentTypeId get contentType => throw UnsupportedError(
