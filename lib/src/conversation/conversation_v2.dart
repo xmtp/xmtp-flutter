@@ -123,6 +123,9 @@ class ConversationManagerV2 {
       .where((convo) => convo != null)
       .map((convo) => convo!);
 
+  Future<Conversation?> decryptConversation(xmtp.Envelope env) =>
+      _conversationFromEnvelope(env);
+
   /// This helper adapts an [envelope] (with an invite) into a [Conversation].
   ///
   /// It returns `null` when the envelope could not be decoded.
@@ -260,6 +263,18 @@ class ConversationManagerV2 {
         .where((msg) => msg != null)
         .map((msg) => msg!);
   }
+
+  /// This decrypts and decodes the [xmtp.Message].
+  ///
+  /// It returns `null` when the message could not be decoded.
+  Future<DecodedMessage?> decryptMessage(
+    Conversation conversation,
+    xmtp.Message msg,
+  ) async =>
+      _decodedFromMessage(
+        conversation,
+        msg,
+      );
 
   /// This decrypts and decodes the [xmtp.Message].
   ///

@@ -2,6 +2,7 @@ import 'package:async/async.dart';
 import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
+import '../common/topic.dart';
 import '../contact.dart';
 import '../content/decoded.dart';
 import 'conversation.dart';
@@ -95,6 +96,29 @@ class ConversationManager {
     ]);
     return messages.expand((m) => m).toList();
   }
+
+  /// This decrypts a [Conversation] from an `envelope`.
+  ///
+  /// It returns `null` when the conversation could not be decrypted.
+  Future<Conversation?> decryptConversation(xmtp.Envelope envelope) async {
+    if (envelope.contentTopic == Topic.userIntro(_me.hex)) {
+      return _v1.decryptConversation(envelope);
+    } else if (envelope.contentTopic == Topic.userInvite(_me.hex)) {
+      return _v2.decryptConversation(envelope);
+    }
+    return null;
+  }
+
+  /// This decrypts and decodes the `msg`.
+  ///
+  /// It returns `null` when the message could not be decoded.
+  Future<DecodedMessage?> decryptMessage(
+    Conversation conversation,
+    xmtp.Message msg,
+  ) async =>
+      conversation.version == xmtp.Message_Version.v1
+          ? _v1.decryptMessage(conversation, msg)
+          : _v2.decryptMessage(conversation, msg);
 
   /// This exposes a stream of new messages in [conversations].
   Stream<DecodedMessage> streamMessages(
