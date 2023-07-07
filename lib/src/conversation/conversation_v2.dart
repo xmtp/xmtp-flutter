@@ -370,7 +370,7 @@ Future<xmtp.InvitationV1> createInviteV1(
     authKeys.wallet.hexEip55,
     peerKeys.wallet.hexEip55,
   ]..sort();
-  var msg = (context.conversationId ?? "") + addresses.join("");
+  var msg = (context.conversationId ?? "") + addresses.join(",");
   var topicId = bytesToHex(await calculateMac(utf8.encode(msg), secret));
   var keyMaterial = await deriveKey(
     secret,
