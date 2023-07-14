@@ -14,7 +14,7 @@ To learn more about XMTP and get answers to frequently asked questions, see the 
 
 ## Quickstart app built with `xmtp-flutter`
 
-Use the [XMTP Flutter quickstart app](https://github.com/xmtp/xmtp-quickstart-react) as a tool to start building an app with XMTP. This basic messaging app has an intentionally unopinionated UI to help make it easier for you to build with.
+Use the [XMTP Flutter quickstart app](https://github.com/xmtp/xmtp-flutter/tree/main/example) as a tool to start building an app with XMTP. This basic messaging app has an intentionally unopinionated UI to help make it easier for you to build with.
 
 ## Reference docs
 
