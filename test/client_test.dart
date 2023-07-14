@@ -8,6 +8,7 @@ import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
 import 'package:xmtp/src/common/signature.dart';
+import 'package:xmtp/src/common/topic.dart';
 import 'package:xmtp/src/content/codec.dart';
 import 'package:xmtp/src/content/text_codec.dart';
 import 'package:xmtp/src/client.dart';
@@ -136,6 +137,57 @@ void main() {
         1234,
         "Hey! I'm about to send you an Integer",
       ]);
+    },
+  );
+
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "push: handle out-of-band decryption of conversations + messages",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+      await delayToPropagate();
+
+      // The Push Server can watch topics but has no keys to decrypt anything
+      var pushApi = createTestServerApi();
+
+      // Alice starts a new conversation with Bob
+      var chat = await alice.newConversation(
+        bob.address.hex,
+        conversationId: "https://example.com/alice-bob-chat",
+      );
+      await delayToPropagate();
+
+      // The push notification server is watching for Bob's new chats
+      var pushBobConvos = await pushApi.client
+          .query(xmtp.QueryRequest(contentTopics: [
+            Topic.userIntro(bob.address.hex),
+            Topic.userInvite(bob.address.hex),
+      ]));
+      expect(pushBobConvos.envelopes.length, 1);
+
+      // When we push that new conversation to Bob he can decrypt it.
+      var bobChat = await bob.decryptConversation(pushBobConvos.envelopes[0]);
+      expect(bobChat!.topic, chat.topic);
+
+      // Then when alice sends a message
+      await alice.sendMessage(chat, "Hey!");
+      await delayToPropagate();
+
+      // The push server is watching for Bob's new messages
+      var pushBobMessages = await pushApi.client
+          .query(xmtp.QueryRequest(contentTopics: [bobChat.topic]));
+      expect(pushBobMessages.envelopes.length, 1);
+
+      // And if we push that encrypted message to Bob he can decrypt it.
+      var bobMsg = await bob.decryptMessage(bobChat,
+          xmtp.Message.fromBuffer(pushBobMessages.envelopes[0].message));
+      expect(bobMsg!.content, "Hey!");
+      expect(bobMsg.sender, alice.address);
     },
   );
 

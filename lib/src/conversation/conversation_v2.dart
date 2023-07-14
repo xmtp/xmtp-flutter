@@ -49,12 +49,13 @@ class ConversationManagerV2 {
     xmtp.InvitationV1_Context context,
   ) async {
     var peer = EthereumAddress.fromHex(address);
-    var invite = createInviteV1(context);
     var peerContact = await contacts.getUserContactV2(peer.hex);
+    var peerKeys = peerContact.v2.keyBundle;
+    var invite = await createInviteV1(auth.keys, peerKeys, context);
     var now = nowNs();
     var sealed = await encryptInviteV1(
       auth.keys,
-      peerContact.v2.keyBundle,
+      peerKeys,
       invite,
       now,
     );
@@ -121,6 +122,9 @@ class ConversationManagerV2 {
       // Remove nulls (which are discarded bad envelopes).
       .where((convo) => convo != null)
       .map((convo) => convo!);
+
+  Future<Conversation?> decryptConversation(xmtp.Envelope env) =>
+      _conversationFromEnvelope(env);
 
   /// This helper adapts an [envelope] (with an invite) into a [Conversation].
   ///
@@ -263,6 +267,18 @@ class ConversationManagerV2 {
   /// This decrypts and decodes the [xmtp.Message].
   ///
   /// It returns `null` when the message could not be decoded.
+  Future<DecodedMessage?> decryptMessage(
+    Conversation conversation,
+    xmtp.Message msg,
+  ) async =>
+      _decodedFromMessage(
+        conversation,
+        msg,
+      );
+
+  /// This decrypts and decodes the [xmtp.Message].
+  ///
+  /// It returns `null` when the message could not be decoded.
   Future<DecodedMessage?> _decodedFromMessage(
     Conversation conversation,
     xmtp.Message msg,
@@ -334,19 +350,35 @@ class ConversationManagerV2 {
 }
 
 /// This uses the provided `context` to create a new conversation invitation.
-/// It randomly generates the topic identifier and encryption key material.
+/// To avoid duplicates, it uses the `authKeys`, `peerKeys`, and `context`
+/// to consistently generate the topic identifier and encryption key material.
 @visibleForTesting
-xmtp.InvitationV1 createInviteV1(xmtp.InvitationV1_Context context) {
-  // The topic is a random string of alphanumerics.
-  // This base64 encodes some random bytes and strips non-alphanumerics.
-  // Note: we don't rely on this being valid base64 anywhere.
-  var randomId = base64.encode(generateRandomBytes(32));
-  randomId = randomId.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
-  var topic = Topic.messageV2(randomId);
-
-  var keyMaterial = generateRandomBytes(32);
+Future<xmtp.InvitationV1> createInviteV1(
+  xmtp.PrivateKeyBundle authKeys,
+  xmtp.SignedPublicKeyBundle peerKeys,
+  xmtp.InvitationV1_Context context,
+) async {
+  // This mirrors xmtp-js -- see InMemoryKeystore.createInvite()
+  var secret = compute3DHSecret(
+    createECPrivateKey(authKeys.identity.privateKey),
+    createECPrivateKey(authKeys.preKeys.first.privateKey),
+    createECPublicKey(peerKeys.identityKey.publicKeyBytes),
+    createECPublicKey(peerKeys.preKey.publicKeyBytes),
+    false,
+  );
+  var addresses = [
+    authKeys.wallet.hexEip55,
+    peerKeys.wallet.hexEip55,
+  ]..sort();
+  var msg = (context.conversationId ?? "") + addresses.join(",");
+  var topicId = bytesToHex(await calculateMac(utf8.encode(msg), secret));
+  var keyMaterial = await deriveKey(
+    secret,
+    nonce: utf8.encode('__XMTP__INVITATION__SALT__XMTP__'),
+    info: utf8.encode(['0', ...addresses].join('|')),
+  );
   return xmtp.InvitationV1(
-    topic: topic,
+    topic: Topic.messageV2(topicId),
     aes256GcmHkdfSha256: xmtp.InvitationV1_Aes256gcmHkdfsha256(
       keyMaterial: keyMaterial,
     ),

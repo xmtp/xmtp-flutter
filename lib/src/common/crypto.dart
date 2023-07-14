@@ -19,6 +19,36 @@ List<int> sha256(List<int> input) => (const DartSha256().newHashSink()
     .hashSync()
     .bytes;
 
+/// This returns the calculated MAC for `message` using `secret`.
+Future<List<int>> calculateMac(
+  List<int> message,
+  List<int> secret,
+) async {
+  var mac = await Hmac(Sha256()).calculateMac(
+    message,
+    secretKey: SecretKey(secret),
+  );
+  return mac.bytes;
+}
+
+/// This consistently derives a key from the `secret` using `nonce` and `info`.
+Future<List<int>> deriveKey(
+  List<int> secret, {
+  List<int> nonce = const <int>[],
+  List<int> info = const <int>[],
+}) async {
+  final hkdf = Hkdf(
+    hmac: Hmac(Sha256()),
+    outputLength: 32,
+  );
+  final key = await hkdf.deriveKey(
+    secretKey: SecretKey(secret),
+    nonce: nonce,
+    info: info,
+  );
+  return key.bytes;
+}
+
 /// This uses the `secret` to encrypt the `message`.
 Future<xmtp.Ciphertext> encrypt(
   List<int> secret,

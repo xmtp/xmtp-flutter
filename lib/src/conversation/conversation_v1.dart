@@ -93,6 +93,12 @@ class ConversationManagerV1 {
       .map((e) => xmtp.Message.fromBuffer(e.message))
       .asyncMap((msg) => _conversationFromIntro(msg));
 
+  /// This decrypts the [Conversation] from an `xmtp.Envelope`.
+  ///
+  /// It returns `null` when the conversation could not be decrypted.
+  Future<Conversation?> decryptConversation(xmtp.Envelope env) =>
+      _conversationFromIntro(xmtp.Message.fromBuffer(env.message));
+
   Future<Conversation> _conversationFromIntro(xmtp.Message msg) async {
     var header = xmtp.MessageHeaderV1.fromBuffer(msg.v1.headerBytes);
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
@@ -161,6 +167,15 @@ class ConversationManagerV1 {
         .where((msg) => msg != null)
         .map((msg) => msg!);
   }
+
+  /// This decrypts and decodes the [xmtp.Message].
+  ///
+  /// It returns `null` when the message could not be decoded.
+  Future<DecodedMessage?> decryptMessage(
+    Conversation conversation,
+    xmtp.Message msg,
+  ) async =>
+      _decodedFromMessage(msg);
 
   /// This decrypts and decodes the [xmtp.Message].
   Future<DecodedMessage?> _decodedFromMessage(xmtp.Message msg) async {
