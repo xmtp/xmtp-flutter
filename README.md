@@ -1,22 +1,20 @@
 # xmtp-flutter
 
-![Test](https://github.com/xmtp/xmtp-flutter/actions/workflows/test.yml/badge.svg) ![Status](https://img.shields.io/badge/Project_Status-General_Availability-31CA54)
+![Test](https://github.com/xmtp/xmtp-flutter/actions/workflows/test.yml/badge.svg) ![Status](https://img.shields.io/badge/Project_Status-Production-31CA54)
 
 `xmtp-flutter` provides a Dart implementation of an XMTP message API client for use with Flutter apps.
 
 Use `xmtp-flutter` to build with XMTP to send messages between blockchain accounts, including DMs, notifications, announcements, and more.
 
-This SDK is in **General Availability** status and ready for use in production. 
-
 To keep up with the latest SDK developments, see the [Issues tab](https://github.com/xmtp/xmtp-flutter/issues) in this repo.
 
-To learn more about XMTP and get answers to frequently asked questions, see [FAQ about XMTP](https://xmtp.org/docs/dev-concepts/faq).
+To learn more about XMTP and get answers to frequently asked questions, see the [XMTP documentation](https://xmtp.org/docs).
 
 ![x-red-sm](https://user-images.githubusercontent.com/510695/163488403-1fb37e86-c673-4b48-954e-8460ae4d4b05.png)
 
-## Example app
+## Quickstart app built with `xmtp-flutter`
 
-For a basic demonstration of the core concepts and capabilities of the `xmtp-flutter` client SDK, see the [Example app project](https://github.com/xmtp/xmtp-flutter/tree/main/example).
+Use the [XMTP Flutter quickstart app](https://github.com/xmtp/xmtp-flutter/tree/main/example) as a tool to start building an app with XMTP. This basic messaging app has an intentionally unopinionated UI to help make it easier for you to build with.
 
 ## Reference docs
 
@@ -45,6 +43,13 @@ var api = xmtp.Api.create();
 var client = await xmtp.Client.createFromWallet(api, wallet);
 ```
 
+## Use local storage
+
+> **Important**  
+> If you are building a production-grade app, be sure to use an architecture that includes a local cache backed by an XMTP SDK.  
+
+To learn more, see [Use a local cache](https://xmtp.org/docs/tutorials/performance#use-a-local-cache).
+
 ## Create a client
 
 The client has two constructors: `createFromWallet` and `createFromKeys`.
@@ -63,7 +68,7 @@ var client = await Client.createFromWallet(api, wallet);
 await mySecureStorage.save(client.keys.writeToBuffer());
 ```
 
-The second time a user launches the app they should call `createFromKeys`
+The second time a user launches the app, they should call `createFromKeys`
 using the stored `keys` from their previous session.
 
 ```dart
@@ -93,9 +98,7 @@ for (var convo in conversations) {
 }
 ```
 
-These conversations include all conversations for a user **regardless of which app created the conversation.** This functionality provides the concept of an interoperable inbox, which enables a user to access all of their conversations in any app built with XMTP.
-
-You might choose to provide an additional filtered view of conversations. To learn more, see [Handle multiple conversations with the same blockchain address](#handle-multiple-conversations-with-the-same-blockchain-address) and [Filter conversations using conversation IDs and metadata](https://xmtp.org/docs/client-sdk/javascript/tutorials/filter-conversations).
+These conversations include all conversations for a user **regardless of which app created the conversation.** This functionality provides the concept of an [interoperable inbox](https://xmtp.org/docs/concepts/interoperable-inbox), which enables a user to access all of their conversations in any app built with XMTP.
 
 ### Listen for new conversations
 
@@ -146,7 +149,7 @@ var messages = await alice.listMessages(convo,
 ### List messages in a conversation with pagination
 
 It may be helpful to retrieve and process the messages in a conversation page by page.
-You can do this by specifying `limit` and `end` which will return the specified number
+You can do this by specifying `limit` and `end`, which will return the specified number
 of messages sent before that time.
 
 ```dart
@@ -160,7 +163,7 @@ var nextPage = await alice.listMessages(
 You can listen for any new messages (incoming or outgoing) in a conversation by calling
 `client.streamMessages(convo)`.
 
-A successfully received message (that makes it through the decoding and decryption) can be trusted
+A successfully received message (that makes it through decoding and decryption) can be trusted
 to be authentic. Authentic means that it was sent by the owner of the `message.sender` account and
 that it wasn't modified in transit. The `message.sentAt` time can be trusted to have been set by
 the sender.
@@ -174,43 +177,14 @@ await listening.cancel();
 ```
 
 > **Note**  
-> This package does not currently include the `streamAllMessages()` functionality from the [XMTP client SDK for JavaScript](https://github.com/xmtp/xmtp-js) (xmtp-js).
-
-### Handle multiple conversations with the same blockchain address
-
-With XMTP, you can have multiple ongoing conversations with the same blockchain address.
-For example, you might want to have a conversation scoped to your particular app, or even
-a conversation scoped to a particular item in your app.
-
-To accomplish this, you can pass a context with a conversationId when you are creating
-a conversation. We recommend conversation IDs start with a domain, to help avoid unwanted collisions
-between your app and other apps on the XMTP network.
-
-```dart
-var friend = "0x123..."; // my friend's address
-
-var workTalk = await client.newConversation(
-  friend,
-  conversationId: "my.example.com/work",
-  metadata: {"title": "Work Talk"},
-);
-var playTalk = await client.newConversation(
-  friend,
-  conversationId: "my.example.com/play",
-  metadata: {"title": "Play Talk"},
-);
-
-var conversations = await client.listConversations();
-var myConversations = conversations.where((c) =>
-    c.conversationId.startsWith("my.example.com/"));
-```
+> This package does not currently include the `streamAllMessages()` functionality from the [XMTP client SDK for JavaScript](https://github.com/xmtp/xmtp-js) (`xmtp-js`).
 
 ## Handle different types of content
 
 When sending a message, you can specify the type of content. This allows you to specify different
 types of content than the default (a simple string, `ContentTypeText`).
 
-To learn more about content types, see [Content types with XMTP](https://xmtp.org/docs/dev-concepts/content-types).
+To learn more about content types, see [Content types with XMTP](https://xmtp.org/docs/concepts/content-types).
 
 Support for other types of content can be added during client construction by registering additional `Codec`s, including a `customCodecs` parameter. Every codec declares a specific content type identifier,
 `ContentTypeId`, which is used to signal to the client which codec should be used to process the
@@ -218,10 +192,6 @@ content that is being sent or received. See [XIP-5](https://github.com/xmtp/XIPs
 for more details on codecs and content types.
 
 Codecs and content types may be proposed as interoperable standards through [XRCs](https://github.com/xmtp/XIPs/blob/main/XIPs/xip-9-composite-content-type.md).
-If there is a concern that the recipient may not be able to handle a non-standard content type,
-the sender can use the `contentFallback` option to provide a string that describes the content being
-sent. If the recipient fails to decode the original content, the fallback will replace it and can be
-used to inform the recipient what the original content was.
 
 ```dart
 /// Example [Codec] for sending [int] values around.
@@ -254,11 +224,16 @@ await client.sendMessage(convo, "Hey here comes my favorite number:");
 await client.sendMessage(convo, 42, contentType: contentTypeInteger);
 ```
 
+As shown in the example above, you must provide a content fallback value. Use it to provide an alt text-like description of the original content. Providing a content fallback value enables clients that don't support the content type to still display something meaningful.
+
+> **Caution**  
+> If you don't provide a content fallback value, clients that don't support the content type will display an empty message. This results in a poor user experience and breaks interoperability.
+
 ## Compression
 
 This package currently does not support message content compression.
 
-## 🏗 **Breaking revisions**
+## 🏗 Breaking revisions
 
 Because `xmtp-flutter` is in active development, you should expect breaking revisions that might require you to adopt the latest SDK release to enable your app to continue working as expected.
 
@@ -302,19 +277,19 @@ Here are some best practices for when to use each environment:
 - `local` (`host: "127.0.0.1"`, default): Use to have a client communicate with an XMTP node you are running locally. For example, an XMTP node developer can use `local` to generate client traffic to test a node running locally.
 
 The `production` network is configured to store messages indefinitely.
-XMTP may occasionally delete messages and keys from the `dev` network, and will provide
+XMTP may occasionally delete messages and keys from the `dev` network and will provide
 advance notice in the [XMTP Discord community](https://discord.gg/xmtp).
 
 ## Publish a new version to pub.dev
 
 1. Determine the next version number based on the [current published version](https://pub.dev/packages/xmtp) in `major.minor.patch` format.
-2. Update the `sdkVersion`  in `common/api.dart` to use the new version.
+2. Update the `sdkVersion` in `common/api.dart` to use the new version.
 3. Update [CHANGELOG.md](https://github.com/xmtp/xmtp-flutter/blob/main/CHANGELOG.md) to include release notes for the new version number.
 4. Merge the updates from Steps 2 & 3 into the `main` branch via a Pull Request.
 5. Checkout the `main` branch, pull the latest changes & run the following commands replacing `{VERSION_NUMBER}` with the new version.
-```bash
-git tag -a v{VERSION_NUMBER} -m "xmtp release v{VERSION_NUMBER}"
-git push origin v{VERSION_NUMBER}
-```
-4. Watch the [GitHub Actions](https://github.com/xmtp/xmtp-flutter/actions) and ensure the `Release` Action succeeds confirming the package has been published.
+    ```bash
+    git tag -a v{VERSION_NUMBER} -m "xmtp release v{VERSION_NUMBER}"
+    git push origin v{VERSION_NUMBER}
+    ```
+4. Watch the [GitHub Actions](https://github.com/xmtp/xmtp-flutter/actions) and ensure the `Release` Action succeeds, confirming the package has been published.
 5. Ensure the new version is up to date at https://pub.dev/packages/xmtp.
