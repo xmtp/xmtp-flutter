@@ -12,7 +12,7 @@ To learn more about XMTP and get answers to frequently asked questions, see the 
 
 ![x-red-sm](https://user-images.githubusercontent.com/510695/163488403-1fb37e86-c673-4b48-954e-8460ae4d4b05.png)
 
-## Quickstart app built wtih `xmtp-flutter`
+## Quickstart app built with `xmtp-flutter`
 
 Use the [XMTP Flutter quickstart app](https://github.com/xmtp/xmtp-quickstart-react) as a tool to start building an app with XMTP. This basic messaging app has an intentionally unopinionated UI to help make it easier for you to build with.
 
@@ -42,6 +42,13 @@ var wallet = EthPrivateKey.createRandom(Random.secure());
 var api = xmtp.Api.create();
 var client = await xmtp.Client.createFromWallet(api, wallet);
 ```
+
+## Use local storage
+
+> **Important**  
+> If you are building a production-grade app, be sure to use an architecture that includes a local cache backed by an XMTP SDK.  
+
+To learn more, see [Use a local cache](https://xmtp.org/docs/tutorials/performance#use-a-local-cache).
 
 ## Create a client
 
@@ -185,10 +192,6 @@ content that is being sent or received. See [XIP-5](https://github.com/xmtp/XIPs
 for more details on codecs and content types.
 
 Codecs and content types may be proposed as interoperable standards through [XRCs](https://github.com/xmtp/XIPs/blob/main/XIPs/xip-9-composite-content-type.md).
-If there is a concern that the recipient may not be able to handle a non-standard content type,
-the sender can use the `contentFallback` option to provide a string that describes the content being
-sent. If the recipient fails to decode the original content, the fallback will replace it and can be
-used to inform the recipient what the original content was.
 
 ```dart
 /// Example [Codec] for sending [int] values around.
@@ -220,6 +223,11 @@ var convo = await client.newConversation("0x...");
 await client.sendMessage(convo, "Hey here comes my favorite number:");
 await client.sendMessage(convo, 42, contentType: contentTypeInteger);
 ```
+
+As shown in the example above, you must provide a content fallback value. Use it to provide an alt text-like description of the original content. Providing a content fallback value enables clients that don't support the content type to still display something meaningful.
+
+> **Caution**  
+> If you don't provide a content fallback value, clients that don't support the content type will display an empty message. This results in a poor user experience and breaks interoperability.
 
 ## Compression
 
