@@ -90,7 +90,7 @@ class ConversationManagerV2 {
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
-    var listing = await api.client.query(xmtp.QueryRequest(
+    var listing = api.client.envelopes(xmtp.QueryRequest(
       contentTopics: [Topic.userInvite(_me.hex)],
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
@@ -99,8 +99,8 @@ class ConversationManagerV2 {
         direction: sort,
       ),
     ));
-    var conversations = await Future.wait(
-        listing.envelopes.map((e) => _conversationFromEnvelope(e)));
+    var conversations = listing
+        .asyncMap((e) => _conversationFromEnvelope(e));
     var unique = <String>{};
     return conversations
         // Remove nulls (which are discarded bad envelopes).

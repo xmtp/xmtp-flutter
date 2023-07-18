@@ -69,7 +69,7 @@ class ConversationManagerV1 {
     int? limit,
     xmtp.SortDirection? sort,
   ]) async {
-    var listing = await _api.client.query(xmtp.QueryRequest(
+    var listing = _api.client.envelopes(xmtp.QueryRequest(
       contentTopics: [Topic.userIntro(_me.hex)],
       startTimeNs: start?.toNs64(),
       endTimeNs: end?.toNs64(),
@@ -78,9 +78,9 @@ class ConversationManagerV1 {
         direction: sort,
       ),
     ));
-    var conversations = await Future.wait(listing.envelopes
-        .map((e) => xmtp.Message.fromBuffer(e.message))
-        .map((msg) => _conversationFromIntro(msg)));
+    var conversations = listing
+        .asyncMap((e) => xmtp.Message.fromBuffer(e.message))
+        .asyncMap((msg) => _conversationFromIntro(msg));
     // Remove duplicates by topic identifier.
     var unique = <String>{};
     return conversations.where((c) => unique.add(c.topic)).toList();
