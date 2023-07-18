@@ -83,6 +83,22 @@ class Api {
   }
 }
 
+extension QueryPaginator on xmtp.MessageApiClient {
+  /// This is a helper for paginating through a full query.
+  /// It yields all the envelopes in the query using the paging info
+  /// from the prior response to fetch the next page.
+  Stream<xmtp.Envelope> envelopes(xmtp.QueryRequest req) async* {
+    xmtp.QueryResponse res;
+    do {
+      res = await query(req);
+      for (var envelope in res.envelopes) {
+        yield envelope;
+      }
+      req.pagingInfo.cursor = res.pagingInfo.cursor;
+    } while (res.envelopes.isNotEmpty && res.pagingInfo.hasCursor());
+  }
+}
+
 /// Creates a [Comparator] that implements the [sort] over [xmtp.Envelope].
 Comparator<xmtp.Envelope> envelopeComparator(xmtp.SortDirection? sort) =>
     (e1, e2) => sort == xmtp.SortDirection.SORT_DIRECTION_ASCENDING
