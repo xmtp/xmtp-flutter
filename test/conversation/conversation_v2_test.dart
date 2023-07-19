@@ -281,7 +281,6 @@ void main() {
     },
   );
 
-
   test(
     "v2 messaging: low-level deterministic invite creation",
     () async {
@@ -290,10 +289,10 @@ void main() {
       var aliceKeys = await aliceWallet.createIdentity(generateKeyPair());
       var bobKeys = await bobWallet.createIdentity(generateKeyPair());
       makeInvite(String conversationId) => createInviteV1(
-        aliceKeys,
-        createContactBundleV2(bobKeys).v2.keyBundle,
-        xmtp.InvitationV1_Context(conversationId: conversationId),
-      );
+            aliceKeys,
+            createContactBundleV2(bobKeys).v2.keyBundle,
+            xmtp.InvitationV1_Context(conversationId: conversationId),
+          );
 
       // Repeatedly making the same invite should use the same topic/keys
       var original = await makeInvite("example.com/conversation-foo");

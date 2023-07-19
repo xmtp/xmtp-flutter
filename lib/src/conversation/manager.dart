@@ -1,7 +1,10 @@
 import 'package:async/async.dart';
+import 'package:quiver/check.dart';
+import 'package:quiver/iterables.dart';
 import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
+import '../common/api.dart';
 import '../common/topic.dart';
 import '../contact.dart';
 import '../content/decoded.dart';
@@ -82,17 +85,33 @@ class ConversationManager {
 
   /// This lists the messages in [conversations].
   Future<List<DecodedMessage>> listMessages(
-    Iterable<Conversation> conversations, [
+    Iterable<Conversation> conversations, {
+    Iterable<Pagination>? paginations,
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort,
-  ]) async {
-    var cv1 = conversations.where((c) => c.version == xmtp.Message_Version.v1);
-    var cv2 = conversations.where((c) => c.version == xmtp.Message_Version.v2);
+  }) async {
+    checkState(
+        paginations == null || paginations.length == conversations.length,
+        message: 'mismatched pagination/conversation specification count');
+    var ps = paginations?.toList() ??
+        List.filled(conversations.length, Pagination(start, end, limit, sort));
+    var v1 = enumerate(conversations)
+        .where((c) => c.value.version == xmtp.Message_Version.v1);
+    var v2 = enumerate(conversations)
+        .where((c) => c.value.version == xmtp.Message_Version.v2);
     var messages = await Future.wait([
-      _v1.listMessages(cv1, start, end, limit, sort),
-      _v2.listMessages(cv2, start, end, limit, sort),
+      _v1.listMessages(
+        v1.map((c) => c.value),
+        paginations: v1.map((c) => ps[c.index]),
+        sort: sort,
+      ),
+      _v2.listMessages(
+        v2.map((c) => c.value),
+        paginations: v2.map((c) => ps[c.index]),
+        sort: sort,
+      ),
     ]);
     return messages.expand((m) => m).toList();
   }

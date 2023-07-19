@@ -83,6 +83,15 @@ class Api {
   }
 }
 
+class Pagination {
+  final DateTime? start;
+  final DateTime? end;
+  final int? limit;
+  final xmtp.SortDirection? sort;
+
+  Pagination(this.start, this.end, this.limit, this.sort);
+}
+
 extension QueryPaginator on xmtp.MessageApiClient {
   /// This is a helper for paginating through a full query.
   /// It yields all the envelopes in the query using the paging info
@@ -96,6 +105,32 @@ extension QueryPaginator on xmtp.MessageApiClient {
       }
       req.pagingInfo.cursor = res.pagingInfo.cursor;
     } while (res.envelopes.isNotEmpty && res.pagingInfo.hasCursor());
+  }
+
+  /// This is a helper for paginating through a full batch of queries.
+  /// It yields all the envelopes in the queries using the paging info
+  /// from the prior responses to fetch the next page for the entire batch.
+  /// Note: the caller is responsible for merging and sorting the results.
+  Stream<xmtp.Envelope> batchEnvelopes(xmtp.BatchQueryRequest bReq) async* {
+    do {
+      var reqByTopic = {
+        for (var req in bReq.requests) req.contentTopics.first: req
+      };
+      var bRes = await batchQuery(bReq);
+      var requests = <xmtp.QueryRequest>[];
+      for (var res in bRes.responses) {
+        for (var envelope in res.envelopes) {
+          yield envelope;
+        }
+        if (res.envelopes.isNotEmpty && res.pagingInfo.hasCursor()) {
+          var req = reqByTopic[res.envelopes.first.contentTopic]!;
+          req.pagingInfo.cursor = res.pagingInfo.cursor;
+          requests.add(req);
+        }
+      }
+      bReq.requests.clear();
+      bReq.requests.addAll(requests);
+    } while (bReq.requests.isNotEmpty);
   }
 }
 
