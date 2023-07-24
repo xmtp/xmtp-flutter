@@ -99,8 +99,7 @@ class ConversationManagerV2 {
         direction: sort,
       ),
     ));
-    var conversations = listing
-        .asyncMap((e) => _conversationFromEnvelope(e));
+    var conversations = listing.asyncMap((e) => _conversationFromEnvelope(e));
     var unique = <String>{};
     return conversations
         // Remove nulls (which are discarded bad envelopes).
@@ -209,33 +208,31 @@ class ConversationManagerV2 {
 
   /// This lists the current messages in the [conversations]
   Future<List<DecodedMessage>> listMessages(
-    Iterable<Conversation> conversations, [
-    DateTime? start,
-    DateTime? end,
-    int? limit,
+    Iterable<Conversation> conversations, {
+    Iterable<Pagination>? paginations,
     xmtp.SortDirection? sort,
-  ]) async {
+  }) async {
     if (conversations.isEmpty) {
       return [];
     }
-    var convoByTopic = {for (var c in conversations) c.topic: c};
-    var requests = conversations.map((c) => xmtp.QueryRequest(
-          contentTopics: [c.topic], // Limit one topic per query
-          startTimeNs: start?.toNs64(),
-          endTimeNs: end?.toNs64(),
+    var ps = paginations?.toList();
+    var requests = enumerate(conversations).map((c) => xmtp.QueryRequest(
+          contentTopics: [c.value.topic], // Limit one topic per query
+          startTimeNs: ps?[c.index].start?.toNs64(),
+          endTimeNs: ps?[c.index].end?.toNs64(),
           pagingInfo: xmtp.PagingInfo(
-            limit: limit,
-            direction: sort,
+            limit: ps?[c.index].limit,
+            direction: ps?[c.index].sort,
           ),
         ));
     // Batch up the requests to avoid requesting too many in one shot.
     var batches = partition(requests, maxQueryRequestsPerBatch);
     var compare = envelopeComparator(sort);
     var results = await Future.wait(batches.map((batch) => api.client
-        .batchQuery(xmtp.BatchQueryRequest(requests: batch))
-        .then((res) => res.responses.expand((r) => r.envelopes))
-        .then((envs) => envs.toList().sorted(compare))));
-    var listing = merge(results, compare);
+        .batchEnvelopes(xmtp.BatchQueryRequest(requests: batch))
+        .toList()));
+    var listing = results.reduce((l, r) => l..addAll(r)).sorted(compare);
+    var convoByTopic = {for (var c in conversations) c.topic: c};
     var messages = await Future.wait(listing
         .where((e) => convoByTopic.containsKey(e.contentTopic))
         .map((e) => _decodedFromMessage(

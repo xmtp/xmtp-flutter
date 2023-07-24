@@ -51,6 +51,7 @@ void main() {
       var bobListening = bob
           .streamMessages(bobConvo)
           .listen((msg) => transcript.add('${msg.sender.hex}> ${msg.content}'));
+      await delayToPropagate();
 
       // Alice sends the first message.
       await alice.sendMessage(aliceConvo, "hello Bob, it's me Alice!");
@@ -163,10 +164,10 @@ void main() {
       await delayToPropagate();
 
       // The push notification server is watching for Bob's new chats
-      var pushBobConvos = await pushApi.client
-          .query(xmtp.QueryRequest(contentTopics: [
-            Topic.userIntro(bob.address.hex),
-            Topic.userInvite(bob.address.hex),
+      var pushBobConvos =
+          await pushApi.client.query(xmtp.QueryRequest(contentTopics: [
+        Topic.userIntro(bob.address.hex),
+        Topic.userInvite(bob.address.hex),
       ]));
       expect(pushBobConvos.envelopes.length, 1);
 
@@ -254,21 +255,21 @@ void main() {
 
       var messages = await alice.listMessages(
         convo,
-        limit: 2,
         sort: xmtp.SortDirection.SORT_DIRECTION_ASCENDING,
       );
-      expect(messages.length, 2);
+      expect(messages.length, 3);
       expect(messages[0].content, "first message to convo");
       expect(messages[1].content, "second message to convo");
+      expect(messages[2].content, "third message to convo");
 
       messages = await alice.listMessages(
         convo,
-        limit: 2,
         sort: xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
       );
-      expect(messages.length, 2);
+      expect(messages.length, 3);
       expect(messages[0].content, "third message to convo");
       expect(messages[1].content, "second message to convo");
+      expect(messages[2].content, "first message to convo");
     },
   );
 
@@ -451,19 +452,64 @@ void main() {
   test(
     skip: "manual testing",
     "conversations: listing conversations with pagination",
-      () async {
-        var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
-        var aliceApi = createTestServerApi();
-        var alice = await Client.createFromWallet(aliceApi, aliceWallet);
-        await _startRandomConversationsWith(
-          alice.address.hex,
-          // > 100 (the server page size)
-          conversationCount: 105,
-          messagesPerConvo: 1,
-        );
-        var conversations = await alice.listConversations();
-        expect(conversations.length, 105);
-      }
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      await _startRandomConversationsWith(
+        alice.address.hex,
+        // > 100 (the server page size)
+        conversationCount: 105,
+        messagesPerConvo: 1,
+      );
+      var conversations = await alice.listConversations();
+      expect(conversations.length, 105);
+    },
+  );
+
+  test(
+    skip: "manual testing",
+    "messages: listing batch messages with pagination",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      await _startRandomConversationsWith(
+        alice.address.hex,
+        // > 50 (the batch size)
+        conversationCount: 60,
+        messagesPerConvo: 1,
+      );
+      await _startRandomConversationsWith(
+        alice.address.hex,
+        // start a couple with lots of entries in them
+        conversationCount: 2,
+        messagesPerConvo: 110,
+      );
+      var conversations = await alice.listConversations();
+      expect(conversations.length, 60 + 2);
+      var messages = await alice.listBatchMessages(conversations);
+      expect(messages.length, 60 + 2 * 110);
+    },
+  );
+
+  test(
+    skip: "manual testing",
+    "messages: listing batch messages with multiple paginations",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      await _startRandomConversationsWith(
+        alice.address.hex,
+        conversationCount: 2,
+        messagesPerConvo: 110,
+      );
+      var conversations = await alice.listConversations();
+      expect(conversations.length, 2);
+      var messages = await alice.listBatchMessages(conversations);
+      expect(messages.length, 2 * 110);
+    },
   );
 
   // This creates a user and sends them lots of messages from other users.

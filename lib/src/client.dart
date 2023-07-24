@@ -148,7 +148,7 @@ class Client implements Codec<DecodedContent> {
   /// If [start] or [end] are specified then this will only list conversations
   /// created at or after [start] and at or before [end].
   ///
-  /// If [limit] is specified then this returns no more than [limit] conversations.
+  /// If [limit] is specified then results are pulled in pages of that size.
   ///
   /// If [sort] is specified then that will control the sort order.
   Future<List<Conversation>> listConversations({
@@ -203,7 +203,7 @@ class Client implements Codec<DecodedContent> {
   /// If [start] or [end] are specified then this will only list messages
   /// sent at or after [start] and at or before [end].
   ///
-  /// If [limit] is specified then this returns no more than [limit] messages.
+  /// If [limit] is specified then results are pulled in pages of that size.
   ///
   /// If [sort] is specified then that will control the sort order.
   Future<List<DecodedMessage>> listMessages(
@@ -213,19 +213,33 @@ class Client implements Codec<DecodedContent> {
     int? limit,
     xmtp.SortDirection sort = xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
   }) =>
-      _conversations.listMessages([conversation], start, end, limit, sort);
+      _conversations.listMessages(
+        [conversation],
+        start: start,
+        end: end,
+        limit: limit,
+        sort: sort,
+      );
 
   /// This lists messages sent to the [conversations].
   /// This is identical to [listMessages] except it pulls messages from
   /// multiple conversations in a single call.
   Future<List<DecodedMessage>> listBatchMessages(
     Iterable<Conversation> conversations, {
+    Iterable<Pagination>? paginations,
     DateTime? start,
     DateTime? end,
     int? limit,
     xmtp.SortDirection sort = xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
   }) =>
-      _conversations.listMessages(conversations, start, end, limit, sort);
+      _conversations.listMessages(
+        conversations,
+        paginations: paginations,
+        start: start,
+        end: end,
+        limit: limit,
+        sort: sort,
+      );
 
   /// This exposes a stream of new messages sent to the [conversation].
   /// For streaming multiple conversations, see [streamBatchMessages].
