@@ -5,9 +5,12 @@ import 'auth.dart';
 import 'common/api.dart';
 import 'common/signature.dart';
 import 'contact.dart';
+import 'content/attachment_codec.dart';
 import 'content/codec.dart';
 import 'content/codec_registry.dart';
 import 'content/composite_codec.dart';
+import 'content/reaction_codec.dart';
+import 'content/reply_codec.dart';
 import 'content/text_codec.dart';
 import 'content/decoded.dart';
 import 'conversation/conversation.dart';
@@ -117,9 +120,17 @@ class Client implements Codec<DecodedContent> {
     var auth = AuthManager(address, api);
     var contacts = ContactManager(api);
     var codecs = CodecRegistry();
-    codecs.registerCodec(TextCodec());
-    codecs.registerCodec(CompositeCodec(codecs));
-    for (var codec in customCodecs) {
+    var commonCodecs = <Codec>[
+      TextCodec(),
+      CompositeCodec(),
+      ReplyCodec(),
+      ReactionCodec(),
+      AttachmentCodec(),
+    ];
+    for (var codec in commonCodecs..addAll(customCodecs)) {
+      if (codec is NestedContentCodec) {
+        codec.setRegistry(codecs);
+      }
       codecs.registerCodec(codec);
     }
     var v1 = ConversationManagerV1(address, api, auth, codecs, contacts);

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -9,7 +10,11 @@ import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 import 'package:xmtp/src/common/api.dart';
 import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp/src/common/topic.dart';
+import 'package:xmtp/src/content/attachment_codec.dart';
 import 'package:xmtp/src/content/codec.dart';
+import 'package:xmtp/src/content/decoded.dart';
+import 'package:xmtp/src/content/reaction_codec.dart';
+import 'package:xmtp/src/content/reply_codec.dart';
 import 'package:xmtp/src/content/text_codec.dart';
 import 'package:xmtp/src/client.dart';
 
@@ -423,6 +428,134 @@ void main() {
         12345,
         "Here's a number:",
       ]);
+    },
+  );
+
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "codecs: sending codec encoded message to user",
+        () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(
+        aliceApi,
+        aliceWallet,
+        customCodecs: [IntegerCodec()],
+      );
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobApi = createTestServerApi();
+      var bob = await Client.createFromWallet(
+        bobApi,
+        bobWallet,
+        customCodecs: [IntegerCodec()],
+      );
+      var convo = await alice.newConversation(bob.address.hex);
+
+      debugPrint('sending as ${alice.address.hexEip55}');
+
+      await alice.sendMessage(convo, "Hello!");
+      await alice.sendMessage(convo, "Here's a number:");
+      await delayToPropagate();
+      await alice.sendMessage(convo, 12345, contentType: contentTypeInteger);
+      await delayToPropagate();
+      await alice.sendMessage(convo, "Do you see it up ^ there?");
+      await delayToPropagate();
+      await alice.sendMessage(convo, "Here's an attachment:");
+      await delayToPropagate();
+      await alice.sendMessage(convo,
+          Attachment("foo.txt", "text/plain", utf8.encode("some writing")),
+          contentType: contentTypeAttachment);
+      await delayToPropagate();
+      await alice.sendMessage(convo, "Do you see it up ^ there?");
+      await delayToPropagate();
+
+      var msg = await alice.sendMessage(convo, "Here's a reaction:");
+      await delayToPropagate();
+      await alice.sendMessage(convo,
+          Reaction(msg.id, ReactionAction.added, ReactionSchema.unicode, "👍"),
+          contentType: contentTypeReaction);
+      await delayToPropagate();
+      await alice.sendMessage(convo, "Do you see it up ^ there?");
+      await delayToPropagate();
+
+      msg = await alice.sendMessage(convo, "Here's a reply:");
+      await delayToPropagate();
+      await alice.sendMessage(
+          convo,
+          Reply(msg.id,
+              DecodedContent(contentTypeText, "I'm replying to myself!")),
+          contentType: contentTypeReply);
+      await delayToPropagate();
+      await alice.sendMessage(convo, "Do you see it up ^ there?");
+      await delayToPropagate();
+
+      msg =
+          await alice.sendMessage(convo, "Here's a reply with an attachment:");
+      await delayToPropagate();
+      await alice.sendMessage(
+        convo,
+        Reply(
+            msg.id,
+            DecodedContent(
+                contentTypeAttachment,
+                Attachment("reply.txt", "text/plain",
+                    utf8.encode("a lengthy reply" * 100)))),
+        contentType: contentTypeReply,
+      );
+      await delayToPropagate();
+      await alice.sendMessage(convo, "Do you see it up ^ there?");
+      await delayToPropagate();
+
+      var messages = await bob.listMessages(convo,
+          sort: xmtp.SortDirection.SORT_DIRECTION_ASCENDING);
+      expect(messages.length, 16);
+      expect(messages[0].content, "Hello!");
+      expect(messages[1].content, "Here's a number:");
+      expect(messages[2].content, 12345);
+      expect(messages[3].content, "Do you see it up ^ there?");
+      expect(messages[4].content, "Here's an attachment:");
+      expect(messages[5].content, isA<Attachment>());
+      expect((messages[5].content as Attachment).mimeType, "text/plain");
+      expect((messages[5].content as Attachment).filename, "foo.txt");
+      expect((messages[5].content as Attachment).data,
+          utf8.encode("some writing"));
+      expect(messages[6].content, "Do you see it up ^ there?");
+      expect(messages[7].content, "Here's a reaction:");
+      expect(messages[8].content, isA<Reaction>());
+      expect((messages[8].content as Reaction).reference, messages[7].id);
+      expect((messages[8].content as Reaction).action, ReactionAction.added);
+      expect((messages[8].content as Reaction).schema, ReactionSchema.unicode);
+      expect((messages[8].content as Reaction).content, "👍");
+      expect(messages[9].content, "Do you see it up ^ there?");
+      expect(messages[10].content, "Here's a reply:");
+      expect(messages[11].content, isA<Reply>());
+      expect((messages[11].content as Reply).reference, messages[10].id);
+      expect(
+        (messages[11].content as Reply).content.contentType,
+        contentTypeText,
+      );
+      expect(
+        (messages[11].content as Reply).content.content,
+        "I'm replying to myself!",
+      );
+      expect(messages[12].content, "Do you see it up ^ there?");
+      expect(messages[13].content, "Here's a reply with an attachment:");
+      expect(messages[14].content, isA<Reply>());
+      expect(
+          (messages[14].content as Reply).content.content, isA<Attachment>());
+      expect(
+          ((messages[14].content as Reply).content.content as Attachment)
+              .mimeType,
+          "text/plain");
+      expect(
+          ((messages[14].content as Reply).content.content as Attachment)
+              .filename,
+          "reply.txt");
+      expect(
+        ((messages[14].content as Reply).content.content as Attachment).data,
+        utf8.encode("a lengthy reply" * 100),
+      );
+      expect(messages[15].content, "Do you see it up ^ there?");
     },
   );
 

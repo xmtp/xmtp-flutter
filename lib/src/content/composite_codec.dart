@@ -13,16 +13,13 @@ final contentTypeComposite = xmtp.ContentTypeId(
 
 /// This is a [Codec] that can handle a composite of other content types.
 ///
-/// It is initialized with a [CodecRegistry] that it uses to encode and decode
-/// the parts of the composite.
+/// It is a [NestedContentCodec] so it has a [CodecRegistry] it uses to encode
+/// and decode the parts of the composite.
 ///
 /// Both [encode] and [decode] are implemented by recursing through the
 /// composite and serializing/deserializing to the [xmtp.Composite] as
 /// the [content] bytes in a [xmtp.EncodedContent] of type [contentTypeComposite].
-class CompositeCodec extends Codec<DecodedComposite> {
-  final Codec<DecodedContent> _registry;
-
-  CompositeCodec(this._registry);
+class CompositeCodec extends NestedContentCodec<DecodedComposite> {
 
   @override
   xmtp.ContentTypeId get contentType => contentTypeComposite;
@@ -47,7 +44,7 @@ class CompositeCodec extends Codec<DecodedComposite> {
     var results = <DecodedComposite>[];
     for (var part in composite.parts) {
       if (part.hasPart()) {
-        var decoded = await _registry.decode(part.part);
+        var decoded = await registry.decode(part.part);
         results.add(DecodedComposite.ofContent(decoded));
       } else {
         var decoded = await _decode(part.composite);
@@ -65,13 +62,13 @@ class CompositeCodec extends Codec<DecodedComposite> {
   /// This recursively encodes the parts of the composite.
   Future<xmtp.Composite> _encode(DecodedComposite decoded) async {
     if (decoded.hasContent) {
-      var encoded = await _registry.encode(decoded.content!);
+      var encoded = await registry.encode(decoded.content!);
       return xmtp.Composite()..parts.add(xmtp.Composite_Part(part: encoded));
     }
     var result = xmtp.Composite();
     for (var part in decoded.parts) {
       if (part.hasContent) {
-        var encoded = await _registry.encode(part.content!);
+        var encoded = await registry.encode(part.content!);
         result.parts.add(xmtp.Composite_Part(part: encoded));
       } else {
         result.parts.add(xmtp.Composite_Part(composite: await _encode(part)));

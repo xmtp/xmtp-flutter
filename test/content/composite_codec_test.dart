@@ -8,7 +8,8 @@ import 'package:xmtp/src/content/text_codec.dart';
 void main() {
   test('single nested string should be encoded/decoded', () async {
     var registry = CodecRegistry()..registerCodec(TextCodec());
-    var codec = CompositeCodec(registry);
+    var codec = CompositeCodec();
+    codec.setRegistry(registry);
 
     var encoded = await codec.encode(
         DecodedComposite.ofContent(DecodedContent(contentTypeText, "foo bar")));
@@ -22,7 +23,8 @@ void main() {
 
   test('multiple strings should be encoded/decoded', () async {
     var registry = CodecRegistry()..registerCodec(TextCodec());
-    var codec = CompositeCodec(registry);
+    var codec = CompositeCodec();
+    codec.setRegistry(registry);
 
     var encoded = await codec.encode(DecodedComposite.withParts([
       DecodedComposite.ofContent(DecodedContent(contentTypeText, "foo")),

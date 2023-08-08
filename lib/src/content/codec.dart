@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
+
+import 'decoded.dart';
 
 /// This defines the interface for a content codec of a particular type [T].
 /// It is responsible for knowing how to [encode] the content [T].
@@ -14,4 +17,19 @@ abstract class Codec<T extends Object> {
 
   /// This is called to encode the content
   Future<xmtp.EncodedContent> encode(T decoded);
+}
+
+/// This is a [Codec] that can handle nested generic content.
+///
+/// These codecs need the full [CodecRegistry] to decode and encode some nested
+/// content as part of implementing their own [encode] and [decode].
+///
+/// See e.g. [CompositeCodec] and [ReplyCodec].
+abstract class NestedContentCodec<T extends Object> implements Codec<T> {
+  @protected
+  late Codec<DecodedContent> registry;
+
+  void setRegistry(Codec<DecodedContent> registry_) {
+    registry = registry_;
+  }
 }
