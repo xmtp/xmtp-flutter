@@ -1,3 +1,10 @@
+## 1.2.0
+- feat: implement codecs for attachment, reaction, and reply
+- fix: batch paginate across multiple queries 
+- fix: list all conversations across multiple query pages
+- fix: join with comma to fix deterministic invites
+- feat: support out-of-band decryption of conversation/message envelopes 
+
 ## 1.1.0
 - feat: use deterministic topic/keyMaterial invite generation
 - fix: discard messages from unsupported codecs when they have no fallback
