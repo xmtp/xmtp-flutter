@@ -10,6 +10,7 @@ import 'package:xmtp/src/common/api.dart';
 import 'package:xmtp/src/common/signature.dart';
 import 'package:xmtp/src/common/time64.dart';
 import 'package:xmtp/src/common/topic.dart';
+import 'package:xmtp/src/common/crypto.dart';
 import 'package:xmtp/src/auth.dart';
 import 'package:xmtp/src/contact.dart';
 import 'package:xmtp/src/content/codec_registry.dart';
@@ -334,16 +335,68 @@ void main() {
               "79c66013569c3d2daecdd48c7fbee945dcdbdc5717d1f4ffd342c4d3f1b7215912829751a94e3ae1" +
               "1007e0a110011a430a4104952b7158cfe819d92743a4132e2e3ae867d72f6a08292aebf471d0a7a2" +
               "907f3e9947719033e20edc9ca9665874bd88c64c6b62c01928065f6069c5c80c699924"));
-      var invite = await createInviteV1(
+      var aliceInvite = await createInviteV1(
         aliceKeys,
         createContactBundleV2(bobKeys).v2.keyBundle,
         xmtp.InvitationV1_Context(conversationId: "test"),
       );
       expect(
-        invite.topic,
+        aliceInvite.topic,
         "/xmtp/0/m-4b52be1e8567d72d0bc407debe2d3c7fca2ae93a47e58c3f9b5c5068aff80ec5/proto",
         reason: "it should produce the same topic as the JS SDK",
       );
+
+      var bobInvite = await createInviteV1(
+        bobKeys,
+        createContactBundleV2(aliceKeys).v2.keyBundle,
+        xmtp.InvitationV1_Context(conversationId: "test"),
+      );
+      expect(
+        bobInvite.topic,
+        "/xmtp/0/m-4b52be1e8567d72d0bc407debe2d3c7fca2ae93a47e58c3f9b5c5068aff80ec5/proto",
+        reason: "it should produce the same topic as the JS SDK",
+      );
+    },
+  );
+
+  test(
+    "v2 messaging: deterministic invite creation bidirectionally",
+        () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceKeys = await aliceWallet.createIdentity(generateKeyPair());
+      var bobKeys = await bobWallet.createIdentity(generateKeyPair());
+      var bobInvite = await createInviteV1(
+        bobKeys,
+        createContactBundleV2(aliceKeys).v2.keyBundle,
+        xmtp.InvitationV1_Context(),
+      );
+
+      var aliceInvite = await createInviteV1(
+        aliceKeys,
+        createContactBundleV2(bobKeys).v2.keyBundle,
+        xmtp.InvitationV1_Context(),
+      );
+
+      final aliceSharedSecret = compute3DHSecret(
+        createECPrivateKey(aliceKeys.identity.privateKey),
+        createECPrivateKey(aliceKeys.preKeys[0].privateKey),
+        createECPublicKey(bobKeys.identity.encodedPublicKey),
+        createECPublicKey(bobKeys.preKeys[0].encodedPublicKey),
+        false,
+      );
+
+      final bobSharedSecret = compute3DHSecret(
+        createECPrivateKey(bobKeys.identity.privateKey),
+        createECPrivateKey(bobKeys.preKeys.first.privateKey),
+        createECPublicKey(aliceKeys.identity.encodedPublicKey),
+        createECPublicKey(aliceKeys.preKeys[0].encodedPublicKey),
+        true,
+      );
+
+      expect(aliceSharedSecret, bobSharedSecret);
+
+      expect(aliceInvite.topic, bobInvite.topic);
     },
   );
 

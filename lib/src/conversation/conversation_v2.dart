@@ -356,16 +356,19 @@ Future<xmtp.InvitationV1> createInviteV1(
   xmtp.InvitationV1_Context context,
 ) async {
   // This mirrors xmtp-js -- see InMemoryKeystore.createInvite()
+  var myAddress = authKeys.wallet.hexEip55;
+  var theirAddress = peerKeys.wallet.hexEip55;
+
   var secret = compute3DHSecret(
     createECPrivateKey(authKeys.identity.privateKey),
     createECPrivateKey(authKeys.preKeys.first.privateKey),
     createECPublicKey(peerKeys.identityKey.publicKeyBytes),
     createECPublicKey(peerKeys.preKey.publicKeyBytes),
-    false,
+    myAddress.compareTo(theirAddress) < 0,
   );
   var addresses = [
-    authKeys.wallet.hexEip55,
-    peerKeys.wallet.hexEip55,
+    myAddress,
+    theirAddress,
   ]..sort();
   var msg = (context.conversationId ?? "") + addresses.join(",");
   var topicId = bytesToHex(await calculateMac(utf8.encode(msg), secret));
