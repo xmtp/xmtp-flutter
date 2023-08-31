@@ -1,3 +1,6 @@
+## 1.2.1
+- fix: make topics actually deterministic in all directions
+
 ## 1.2.0
 - feat: implement codecs for attachment, reaction, and reply
 - fix: batch paginate across multiple queries 
