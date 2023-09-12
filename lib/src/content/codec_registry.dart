@@ -46,4 +46,9 @@ class CodecRegistry implements Codec<DecodedContent> {
   @override
   xmtp.ContentTypeId get contentType =>
       throw UnsupportedError("the registry, as a Codec, has no content type");
+
+  @override
+  String? fallback(DecodedContent content) {
+    return null;
+  }
 }

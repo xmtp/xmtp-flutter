@@ -44,4 +44,9 @@ class AttachmentCodec extends Codec<Attachment> {
     },
     content: decoded.data,
   );
+
+  @override
+  String? fallback(Attachment content) {
+    return "Can’t display \"${content.filename}\". This app doesn’t support attachments.";
+  }
 }

@@ -336,4 +336,9 @@ class Client implements Codec<DecodedContent> {
   xmtp.ContentTypeId get contentType => throw UnsupportedError(
         "the Client, as a Codec, does not advertise a single content type",
       );
+
+  @override
+  String? fallback(DecodedContent content) {
+    return null;
+  }
 }

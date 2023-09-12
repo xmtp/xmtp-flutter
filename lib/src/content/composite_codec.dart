@@ -76,4 +76,9 @@ class CompositeCodec extends NestedContentCodec<DecodedComposite> {
     }
     return result;
   }
+
+  @override
+  String? fallback(DecodedComposite content) {
+    return null;
+  }
 }

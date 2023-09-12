@@ -17,6 +17,8 @@ abstract class Codec<T extends Object> {
 
   /// This is called to encode the content
   Future<xmtp.EncodedContent> encode(T decoded);
+
+  String? fallback(T content);
 }
 
 /// This is a [Codec] that can handle nested generic content.

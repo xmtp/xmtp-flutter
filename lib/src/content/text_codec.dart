@@ -35,4 +35,9 @@ class TextCodec extends Codec<String> {
         parameters: {'encoding': defaultEncoding},
         content: utf8.encode(decoded),
       );
+
+  @override
+  String? fallback(String content) {
+    return null;
+  }
 }

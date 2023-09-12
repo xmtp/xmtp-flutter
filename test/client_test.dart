@@ -718,4 +718,9 @@ class IntegerCodec extends Codec<int> {
         type: contentTypeInteger,
         content: Uint8List(8)..buffer.asByteData().setInt64(0, decoded),
       );
+
+  @override
+  String? fallback(int content) {
+    return null;
+  }
 }
