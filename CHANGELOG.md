@@ -1,3 +1,6 @@
+## 1.3.0
+- feat: update codecs to include fallback
+
 ## 1.2.1
 - fix: make topics actually deterministic in all directions
 
