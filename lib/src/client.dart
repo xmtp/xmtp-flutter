@@ -337,8 +337,9 @@ class Client implements Codec<DecodedContent> {
         "the Client, as a Codec, does not advertise a single content type",
       );
 
+  /// This may provide text that can be displayed instead of the content.
+  /// It can be used in contexts that do not support rendering a content type.
   @override
-  String? fallback(DecodedContent content) {
-    return null;
-  }
+  String? fallback(DecodedContent content) =>
+      _codecs.fallback(content);
 }
