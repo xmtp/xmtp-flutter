@@ -51,6 +51,6 @@ class CodecRegistry implements Codec<DecodedContent> {
   String? fallback(DecodedContent content) {
     var type = content.contentType;
     var codec = _codecFor(type);
-    return codec?.fallback(content);
+    return codec?.fallback(content.content);
   }
 }

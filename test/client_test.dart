@@ -541,7 +541,7 @@ void main() {
       expect(
           alice.fallback(
               DecodedContent(messages[11].contentType, messages[11].content)),
-          "Replied with “I'm replying to myself” to an earlier message");
+          "Replied with “I'm replying to myself!” to an earlier message");
       expect(messages[12].content, "Do you see it up ^ there?");
       expect(messages[13].content, "Here's a reply with an attachment:");
       expect(messages[14].content, isA<Reply>());

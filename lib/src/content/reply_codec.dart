@@ -50,10 +50,9 @@ class ReplyCodec extends NestedContentCodec<Reply> {
 
   @override
   String? fallback(Reply content) {
-    var nestedFallback = registry.fallback(content.content);
-    if (nestedFallback == null) {
-      return "Replied to an earlier message";
+    if (content.content.contentType.typeId == "text") {
+      return "Replied with “${content.content.content}” to an earlier message";
     }
-    return "Replied with “$nestedFallback” to an earlier message";
+    return "Replied to an earlier message";
   }
 }
