@@ -66,4 +66,16 @@ class ReactionCodec extends Codec<Reaction> {
         type: contentTypeReaction,
         content: utf8.encode(decoded.toJson()),
       );
+
+  @override
+  String? fallback(Reaction content) {
+    switch (content.action) {
+      case ReactionAction.added:
+        return "Reacted “${content.content}” to an earlier message";
+      case ReactionAction.removed:
+        return "Removed “${content.content}” from an earlier message";
+      default:
+        return null;
+    }
+  }
 }

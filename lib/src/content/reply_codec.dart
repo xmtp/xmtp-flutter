@@ -47,4 +47,12 @@ class ReplyCodec extends NestedContentCodec<Reply> {
         },
         content: (await registry.encode(decoded.content)).writeToBuffer(),
       );
+
+  @override
+  String? fallback(Reply content) {
+    if (content.content.contentType.typeId == "text") {
+      return "Replied with “${content.content.content}” to an earlier message";
+    }
+    return "Replied to an earlier message";
+  }
 }
