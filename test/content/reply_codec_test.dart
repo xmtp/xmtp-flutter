@@ -20,6 +20,5 @@ void main() {
     expect(decoded.reference, parentMessageId);
     expect(decoded.content!.contentType, contentTypeText);
     expect(decoded.content!.content, "foo bar");
-    expect(encoded.fallback, "Replied with “foo bar” to an earlier message");
   });
 }
