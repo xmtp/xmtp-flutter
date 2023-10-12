@@ -121,7 +121,7 @@ extension QueryPaginator on xmtp.MessageApiClient {
       for (var res in bRes.responses) {
         if (res.pagingInfo.hasLimit() &&
             res.envelopes.length >= res.pagingInfo.limit &&
-            res.pagingInfo.limit != 100) {
+            res.pagingInfo.limit < 100) {
           var envelopes = res.envelopes.take(res.pagingInfo.limit).toList();
           for (var envelope in envelopes) {
             yield envelope;
