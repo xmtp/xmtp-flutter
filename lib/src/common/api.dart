@@ -119,13 +119,20 @@ extension QueryPaginator on xmtp.MessageApiClient {
       var bRes = await batchQuery(bReq);
       var requests = <xmtp.QueryRequest>[];
       for (var res in bRes.responses) {
-        for (var envelope in res.envelopes) {
-          yield envelope;
-        }
-        if (res.envelopes.isNotEmpty && res.pagingInfo.hasCursor()) {
-          var req = reqByTopic[res.envelopes.first.contentTopic]!;
-          req.pagingInfo.cursor = res.pagingInfo.cursor;
-          requests.add(req);
+        if (res.pagingInfo.hasLimit() && res.envelopes.length >= res.pagingInfo.limit) {
+          var envelopes = res.envelopes.take(res.pagingInfo.limit).toList();
+          for (var envelope in envelopes) {
+            yield envelope;
+          }
+        } else {
+          for (var envelope in res.envelopes) {
+            yield envelope;
+          }
+          if (res.envelopes.isNotEmpty && res.pagingInfo.hasCursor()) {
+            var req = reqByTopic[res.envelopes.first.contentTopic]!;
+            req.pagingInfo.cursor = res.pagingInfo.cursor;
+            requests.add(req);
+          }
         }
       }
       bReq.requests.clear();
