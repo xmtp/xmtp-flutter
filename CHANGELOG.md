@@ -1,3 +1,6 @@
+## 1.3.1
+- fix: respect limits on batched messages
+
 ## 1.3.0
 - feat: update codecs to include fallback
 

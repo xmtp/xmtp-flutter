@@ -606,6 +606,32 @@ void main() {
 
   test(
     skip: "manual testing",
+    "messages: listing batch messages first message",
+        () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      await _startRandomConversationsWith(
+        alice.address.hex,
+        // > 50 (the batch size)
+        conversationCount: 60,
+        messagesPerConvo: 1,
+      );
+      await _startRandomConversationsWith(
+        alice.address.hex,
+        // start a couple with lots of entries in them
+        conversationCount: 2,
+        messagesPerConvo: 110,
+      );
+      var conversations = await alice.listConversations();
+      expect(conversations.length, 60 + 2);
+      var messages = await alice.listBatchMessages(conversations, limit: 1);
+      expect(messages.length, 60 + 2);
+    },
+  );
+
+  test(
+    skip: "manual testing",
     "messages: listing batch messages with pagination",
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
