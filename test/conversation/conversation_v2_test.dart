@@ -361,7 +361,7 @@ void main() {
 
   test(
     "v2 messaging: deterministic invite creation bidirectionally",
-        () async {
+    () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceKeys = await aliceWallet.createIdentity(generateKeyPair());
@@ -586,7 +586,7 @@ void main() {
       var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(wallet.address, api);
       var codecs = CodecRegistry()..registerCodec(TextCodec());
-      var contacts = ContactManager(api);
+      var contacts = ContactManager(api, auth);
       await auth.authenticateWithCredentials(wallet);
       var v2 = ConversationManagerV2(
         wallet.address,
@@ -617,7 +617,7 @@ Future<ConversationManagerV2> _createLocalManager(
   var api = createTestServerApi(debugLogRequests: debugLogRequests);
   var auth = AuthManager(wallet.address, api);
   var codecs = CodecRegistry()..registerCodec(TextCodec());
-  var contacts = ContactManager(api);
+  var contacts = ContactManager(api, auth);
   var keys = await auth.authenticateWithCredentials(wallet);
   var myContacts = await contacts.getUserContacts(wallet.address.hex);
   if (myContacts.isEmpty) {

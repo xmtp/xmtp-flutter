@@ -142,7 +142,7 @@ void main() {
       );
       var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var auth = AuthManager(wallet.address, api);
-      var contacts = ContactManager(api);
+      var contacts = ContactManager(api, auth);
       var codecs = CodecRegistry()..registerCodec(TextCodec());
       await auth.authenticateWithCredentials(wallet);
       var v1 = ConversationManagerV1(
@@ -173,7 +173,7 @@ Future<ConversationManagerV1> _createLocalManager(
 }) async {
   var api = createTestServerApi(debugLogRequests: debugLogRequests);
   var auth = AuthManager(wallet.address, api);
-  var contacts = ContactManager(api);
+  var contacts = ContactManager(api, auth);
   var codecs = CodecRegistry()..registerCodec(TextCodec());
   var keys = await auth.authenticateWithCredentials(wallet);
   var myContacts = await contacts.getUserContacts(wallet.address.hex);

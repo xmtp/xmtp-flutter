@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:xmtp_bindings_flutter/xmtp_bindings_flutter.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'auth.dart';
@@ -19,9 +23,15 @@ import 'common/topic.dart';
 /// See [saveContact].
 class ContactManager {
   final Api _api;
+  final AuthManager _auth;
   final Multimap<String, xmtp.ContactBundle> _contacts;
+  final Map<String, ContactConsent> _consentByAddress;
+  DateTime? _lastRefreshedConsentsAt;
 
-  ContactManager(this._api) : _contacts = Multimap();
+  ContactManager(this._api, this._auth)
+      : _contacts = Multimap(),
+        _consentByAddress = {},
+        _lastRefreshedConsentsAt = null;
 
   Future<List<xmtp.ContactBundle>> getUserContacts(
     String walletAddress,
@@ -97,6 +107,229 @@ class ContactManager {
     await saveContact(keys);
     return true;
   }
+
+  ContactConsent checkConsent(EthereumAddress address) =>
+      _consentByAddress[address.hexEip55] ?? ContactConsent.unknown;
+
+  importConsents({
+    Iterable<String> allowedWalletAddresses = const [],
+    Iterable<String> deniedWalletAddresses = const [],
+    DateTime? lastRefreshedAt,
+  }) {
+    _consentByAddress.clear();
+    _consentByAddress.addEntries(allowedWalletAddresses
+        .map(_normalizeAddress)
+        .map((address) => MapEntry(address, ContactConsent.allow)));
+    _consentByAddress.addEntries(deniedWalletAddresses
+        .map(_normalizeAddress)
+        .map((address) => MapEntry(address, ContactConsent.deny)));
+    _lastRefreshedConsentsAt = lastRefreshedAt;
+  }
+
+  CompactConsents exportConsents() => CompactConsents(
+        xmtp.PrivatePreferencesAction_Allow(
+          walletAddresses: _consentByAddress.entries
+              .where((e) => e.value == ContactConsent.allow)
+              .map((e) => e.key)
+              .toList(),
+        ),
+        xmtp.PrivatePreferencesAction_Block(
+          walletAddresses: _consentByAddress.entries
+              .where((e) => e.value == ContactConsent.deny)
+              .map((e) => e.key)
+              .toList(),
+        ),
+        _lastRefreshedConsentsAt,
+      );
+
+  Future<bool> refreshConsents(xmtp.PrivateKeyBundle keys,
+      {bool fullRefresh = false}) async {
+    var startTimeNs = _lastRefreshedConsentsAt?.toNs64();
+    if (fullRefresh) {
+      startTimeNs = null;
+    }
+    var topic = await Topic.userPreferences(keys.identity.privateKey);
+    var listing = _api.client.envelopes(xmtp.QueryRequest(
+      contentTopics: [topic],
+      startTimeNs: startTimeNs,
+      pagingInfo: xmtp.PagingInfo(
+        limit: 100,
+        direction: xmtp.SortDirection.SORT_DIRECTION_ASCENDING,
+      ),
+    ));
+    var actions = await listing
+        .asyncMap((e) => _actionFromMessage(keys, e.message))
+        // discard any invalid or irrelevant actions
+        .where((a) => a != null)
+        .map((a) => a!)
+        .where((a) => a.hasBlock() || a.hasAllow())
+        .map((a) {
+          var addresses =
+              a.hasBlock() ? a.block.walletAddresses : a.allow.walletAddresses;
+          var consent =
+              a.hasBlock() ? ContactConsent.deny : ContactConsent.allow;
+          return addresses
+              .map((address) => MapEntry(_normalizeAddress(address), consent));
+        })
+        .expand((e) => e)
+        .toList();
+    _consentByAddress.addEntries(actions);
+    _lastRefreshedConsentsAt = DateTime.now();
+    return true;
+  }
+
+  Future<xmtp.PrivatePreferencesAction?> _actionFromMessage(
+    xmtp.PrivateKeyBundle keys,
+    List<int> payload,
+  ) async {
+    try {
+      var decrypted = await libxmtp.userPreferencesDecrypt(
+        publicKey: keys.identity.publicKey.getEncoded(false),
+        privateKey: keys.identity.privateKey,
+        encryptedMessage: Uint8List.fromList(payload),
+      );
+      return xmtp.PrivatePreferencesAction.fromBuffer(decrypted);
+    } catch (err) {
+      debugPrint('discarding bad user preference action: $err');
+      return null;
+    }
+  }
+
+  Future<bool> deny(
+    xmtp.PrivateKeyBundle keys,
+    EthereumAddress ethereumAddress,
+  ) async {
+    _consentByAddress[ethereumAddress.hexEip55] = ContactConsent.deny;
+    var action = xmtp.PrivatePreferencesAction()
+      ..block = xmtp.PrivatePreferencesAction_Block(
+        walletAddresses: [ethereumAddress.hexEip55],
+      );
+    await _publishAction(keys, action);
+    return true;
+  }
+
+  Future<bool> allow(
+    xmtp.PrivateKeyBundle keys,
+    EthereumAddress ethereumAddress,
+  ) async {
+    _consentByAddress[ethereumAddress.hexEip55] = ContactConsent.allow;
+    var action = xmtp.PrivatePreferencesAction()
+      ..allow = xmtp.PrivatePreferencesAction_Allow(
+        walletAddresses: [ethereumAddress.hexEip55],
+      );
+    await _publishAction(keys, action);
+    return true;
+  }
+
+  Future<xmtp.PublishResponse> _publishAction(
+    xmtp.PrivateKeyBundle keys,
+    xmtp.PrivatePreferencesAction action,
+  ) async {
+    var topic = await Topic.userPreferences(keys.identity.privateKey);
+    var payload = await libxmtp.userPreferencesEncrypt(
+      publicKey: keys.identity.publicKey.getEncoded(false),
+      privateKey: keys.identity.privateKey,
+      message: action.writeToBuffer(),
+    );
+    return _api.client.publish(
+      xmtp.PublishRequest(
+        envelopes: [
+          xmtp.Envelope(
+            contentTopic: topic,
+            timestampNs: nowNs(),
+            message: payload,
+          )
+        ],
+      ),
+    );
+  }
+}
+
+String _normalizeAddress(String address) =>
+    EthereumAddress.fromHex(address).hexEip55;
+
+/// This is a compact representation of the user's consents.
+///
+/// For convenience, it includes serializing helpers to/from bytes.
+class CompactConsents {
+  // All explicitly allowed contacts.
+  final xmtp.PrivatePreferencesAction_Allow allowed;
+
+  // All explicitly denied contacts.
+  final xmtp.PrivatePreferencesAction_Block denied;
+
+  // The time we last refreshed consents from the network, if ever.
+  final DateTime? lastRefreshedAt;
+
+  CompactConsents(this.allowed, this.denied, this.lastRefreshedAt);
+
+  static const _addressByteLength = EthereumAddress.addressByteLength;
+
+  Uint8List writeToBuffer() {
+    // 3 64-bit numbers in the header followed by the allowed/blocked addresses.
+    var header = Uint8List(3 * 8);
+    var lastRefreshed64 = lastRefreshedAt?.millisecondsSinceEpoch ?? 0;
+    header.buffer.asByteData().setUint64(0, lastRefreshed64);
+    header.buffer.asByteData().setUint64(8, allowed.walletAddresses.length);
+    header.buffer.asByteData().setUint64(16, denied.walletAddresses.length);
+
+    List<int> out = header;
+    // Note: we sort the addresses so the output is deterministic.
+    for (var address in List.of(allowed.walletAddresses)..sort()) {
+      out += EthereumAddress.fromHex(address).addressBytes;
+    }
+    for (var address in List.of(denied.walletAddresses)..sort()) {
+      out += EthereumAddress.fromHex(address).addressBytes;
+    }
+    return Uint8List.fromList(out);
+  }
+
+  static CompactConsents fromBuffer(List<int> buffer) {
+    var input = Uint8List.fromList(buffer);
+
+    // 3 64-bit numbers then the allowed and blocked messages.
+    var lastRefreshed64 = input.buffer.asByteData().getUint64(0);
+    var allowedLength = input.buffer.asByteData().getUint64(8);
+    var blockedLength = input.buffer.asByteData().getUint64(16);
+    checkArgument(
+        buffer.length ==
+            3 * 8 + (allowedLength + blockedLength) * _addressByteLength,
+        message: 'invalid buffer length');
+
+    var offset = 3 * 8;
+    var allowed = List.generate(allowedLength, (i) {
+      var address = EthereumAddress(
+          Uint8List.view(input.buffer, offset, _addressByteLength));
+      offset += _addressByteLength;
+      return address.hexEip55;
+    });
+
+    var denied = List.generate(blockedLength, (i) {
+      var address = EthereumAddress(
+          Uint8List.view(input.buffer, offset, _addressByteLength));
+      offset += _addressByteLength;
+      return address.hexEip55;
+    });
+
+    return CompactConsents(
+      xmtp.PrivatePreferencesAction_Allow(walletAddresses: allowed),
+      xmtp.PrivatePreferencesAction_Block(walletAddresses: denied),
+      lastRefreshed64 == 0
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(lastRefreshed64, isUtc: true),
+    );
+  }
+}
+
+enum ContactConsent {
+  /// This indicates that the user has not yet consented to the contact.
+  unknown,
+
+  /// This indicates that the user has consented to the contact.
+  allow,
+
+  /// This indicates that the user has explicitly denied the contact.
+  deny,
 }
 
 /// This adds a helper to [xmtp.Envelope] to help when

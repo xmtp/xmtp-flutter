@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:xmtp/src/contact.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
@@ -356,6 +357,66 @@ void main() {
 
   test(
     skip: skipUnlessTestServerEnabled,
+    "messaging: contact consent should be persisted",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobApi = createTestServerApi();
+      var carlWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var carlApi = createTestServerApi();
+      var danaWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var danaApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+      var carl = await Client.createFromWallet(carlApi, carlWallet);
+      var dana = await Client.createFromWallet(danaApi, danaWallet);
+      await delayToPropagate();
+
+      await alice.denyContact(bob.address.hex);
+      await alice.allowContact(carl.address.hex);
+      await delayToPropagate();
+      expect(alice.checkContactConsent(bob.address.hex), ContactConsent.deny);
+      expect(alice.checkContactConsent(carl.address.hex), ContactConsent.allow);
+      expect(
+          alice.checkContactConsent(dana.address.hex), ContactConsent.unknown);
+
+      // The new session should pickup her old consents.
+      alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      await alice.refreshContactConsentPreferences();
+      expect(alice.checkContactConsent(bob.address.hex), ContactConsent.deny);
+      expect(alice.checkContactConsent(carl.address.hex), ContactConsent.allow);
+      expect(
+          alice.checkContactConsent(dana.address.hex), ContactConsent.unknown);
+
+      // To make sure the consent loading handles many pages of consent actions,
+      // we'll simulate Alice changing her mind many times about Bob and Carl.
+      for (var i = 0; i < 100; ++i) {
+        if (i % 2 == 0) {
+          await alice.denyContact(bob.address.hex);
+          await alice.allowContact(carl.address.hex);
+        } else {
+          await alice.denyContact(carl.address.hex);
+          await alice.allowContact(bob.address.hex);
+        }
+      }
+      await delayToPropagate();
+
+      // But in the end Alice allows them both.
+      await alice.allowContact(bob.address.hex);
+      await alice.allowContact(carl.address.hex);
+      await delayToPropagate();
+
+      // And when we start a new session, her consent should be remembered.
+      alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      await alice.refreshContactConsentPreferences();
+      expect(alice.checkContactConsent(bob.address.hex), ContactConsent.allow);
+      expect(alice.checkContactConsent(carl.address.hex), ContactConsent.allow);
+    },
+  );
+
+  test(
+    skip: skipUnlessTestServerEnabled,
     timeout: const Timeout.factor(5), // TODO: consider turning off in CI
     "messaging: batch requests should be partitioned to fit max batch size",
     () async {
@@ -587,6 +648,23 @@ void main() {
   );
 
   test(
+    skip: "manual testing only",
+    "dev: inspecting consent state for known wallet on dev network",
+    () async {
+      // Inspect a known wallet w/ many conversations and 100/100 consents
+      var api = Api.create(host: 'dev.xmtp.network');
+      var wallet = EthPrivateKey.fromHex(
+              "0x0836200ffafa17a3cb8b54f22d6afa60b13da48726543241adc5c250dbb0e0cd")
+          .asSigner();
+      var client = await Client.createFromWallet(api, wallet);
+      await client.refreshContactConsentPreferences();
+      var consents = client.exportContactConsents();
+      expect(consents.denied.walletAddresses.length, 100);
+      expect(consents.allowed.walletAddresses.length, 100);
+    },
+  );
+
+  test(
     skip: "manual testing",
     "conversations: listing conversations with pagination",
     () async {
@@ -607,7 +685,7 @@ void main() {
   test(
     skip: "manual testing",
     "messages: listing batch messages first message",
-        () async {
+    () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
       var aliceApi = createTestServerApi();
       var alice = await Client.createFromWallet(aliceApi, aliceWallet);

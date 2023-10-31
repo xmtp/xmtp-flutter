@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:web3dart/credentials.dart';
+import 'package:xmtp_bindings_flutter/xmtp_bindings_flutter.dart';
 
 /// Clients interact with XMTP by querying, subscribing, and publishing
 /// to these topics.
@@ -38,6 +41,14 @@ class Topic {
   static String userPrivateStoreKeyBundle(String walletAddress) =>
       _content('privatestore-${_normalize(walletAddress)}/key_bundle');
 
+  static Future<String> userPreferences(List<int> privateKey) async => _content(
+      'userpreferences-${await generateUserPreferencesIdentifier(privateKey)}');
+
   static _normalize(String walletAddress) =>
       EthereumAddress.fromHex(walletAddress).hexEip55;
 }
+
+Future<String> generateUserPreferencesIdentifier(List<int> privateKey) async =>
+    libxmtp.generatePrivatePreferencesTopicIdentifier(
+      privateKeyBytes: Uint8List.fromList(privateKey),
+    );

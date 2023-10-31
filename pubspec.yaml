@@ -5,8 +5,8 @@ version: 0.0.0
 repository: https://github.com/xmtp/xmtp-flutter
 
 environment:
-  sdk: '>=2.19.0 <3.0.0'
-  flutter: ">=3.7.0"
+  sdk: '>=3.1.5 <4.0.0'
+  flutter: '>=3.7.0'
 
 dependencies:
   async: ^2.10.0
@@ -19,7 +19,12 @@ dependencies:
   pointycastle: ^3.6.2
   quiver: ^3.2.1
   web3dart: ^2.6.1
-  xmtp_proto: ^3.23.0
+  xmtp_proto: ^3.33.0
+  xmtp_bindings_flutter: ^0.0.1-development.4
+#    path: ../libxmtp/bindings_flutter
+
+dependency_overrides:
+  stream_channel: ^2.1.1
 
 dev_dependencies:
   flutter_test:

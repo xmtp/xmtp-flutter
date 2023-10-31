@@ -58,6 +58,7 @@ class BackgroundManager {
     var conversations = await _db.selectConversations().get();
     var lastReceivedAt = await _db.selectLastReceivedSentAt().getSingleOrNull();
     await _refreshMessages(conversations, since: lastReceivedAt);
+    await _client.refreshContactConsentPreferences();
   }
 
   Future<void> stop() async {

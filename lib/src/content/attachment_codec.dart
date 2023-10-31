@@ -28,22 +28,22 @@ class AttachmentCodec extends Codec<Attachment> {
   xmtp.ContentTypeId get contentType => contentTypeAttachment;
 
   @override
-  Future<Attachment> decode(xmtp.EncodedContent encoded) async =>
-      Attachment(
+  Future<Attachment> decode(xmtp.EncodedContent encoded) async => Attachment(
         encoded.parameters["filename"] ?? "",
         encoded.parameters["mimeType"] ?? "",
         encoded.content,
       );
 
   @override
-  Future<xmtp.EncodedContent> encode(Attachment decoded) async => xmtp.EncodedContent(
-    type: contentTypeAttachment,
-    parameters: {
-      "filename": decoded.filename,
-      "mimeType": decoded.mimeType,
-    },
-    content: decoded.data,
-  );
+  Future<xmtp.EncodedContent> encode(Attachment decoded) async =>
+      xmtp.EncodedContent(
+        type: contentTypeAttachment,
+        parameters: {
+          "filename": decoded.filename,
+          "mimeType": decoded.mimeType,
+        },
+        content: decoded.data,
+      );
 
   @override
   String? fallback(Attachment content) {
