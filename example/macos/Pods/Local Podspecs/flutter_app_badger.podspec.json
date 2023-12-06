@@ -1,0 +1,24 @@
+{
+  "name": "flutter_app_badger",
+  "version": "1.3.0",
+  "summary": "Plugin to update the app badge on the launcher (both for Android, iOS and macOS)",
+  "description": "Plugin to update the app badge on the launcher (both for Android, iOS and macOS)",
+  "homepage": "https://github.com/g123k/flutter_app_badger",
+  "license": {
+    "file": "../LICENSE"
+  },
+  "authors": "Edouard Marquez",
+  "source": {
+    "path": "."
+  },
+  "source_files": "Classes/**/*",
+  "public_header_files": "Classes/**/*.h",
+  "dependencies": {
+    "FlutterMacOS": [
+
+    ]
+  },
+  "platforms": {
+    "osx": "10.11"
+  }
+}

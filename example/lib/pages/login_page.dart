@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:web3dart/web3dart.dart';
 import 'package:go_router/go_router.dart';
+import 'package:xmtp/xmtp.dart' as xmtp;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import "dart:math";
 
 import '../session/foreground_session.dart';
 import '../wallet.dart';
@@ -36,6 +39,7 @@ class LoginPage extends HookWidget {
               ElevatedButton(
                 child: const Text('Connect Wallet'),
                 onPressed: () async {
+                  print('onpress')
                   showModalBottomSheet<void>(
                     context: context,
                     builder: (BuildContext context) => const _BottomQrModal(),
@@ -52,6 +56,46 @@ class LoginPage extends HookWidget {
                     context.goNamed('home');
                   } catch (err) {
                     Navigator.pop(context);
+                  }
+                },
+              ),
+              
+              ElevatedButton(
+                child: const Text('Create Random Wallet'),
+                onPressed: () async {
+                  try {
+                    print('Creating a random wallet...');
+                    var wallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+                    print('Wallet created with address: ${await wallet.address}');
+                    print('Authorizing the wallet...');
+                    bool isAuthorized = await session.authorize(wallet);
+                    print('Wallet authorized: $isAuthorized');
+                    print(context);
+                    context.goNamed('home');
+                    print('Session: $session');
+                    print('Context: $context');
+                    context.goNamed('home');
+                    print('Navigation to home completed.');
+                  } catch (e) {
+                    print('Errorf: $e');
+                  }
+                },
+              ),
+              ElevatedButton(
+                child: const Text('Start from Private Key'),
+                onPressed: () async {
+                  try {
+                    print('Creating a random wallet...');
+                    var wallet = EthPrivateKey.fromHex('key').asSigner();
+                    print('Wallet created with address: ${await wallet.address}');
+                    print('Authorizing the wallet...');
+                    await session.authorize(wallet);
+                    print('Wallet authorized.');
+                    print('Navigating to home...');
+                    context.goNamed('home');
+                    print('Navigation to home completed.');
+                  } catch (e) {
+                    print('Errorf: $e');
                   }
                 },
               ),
@@ -95,7 +139,7 @@ class _BottomQrModal extends HookWidget {
           ),
           const SizedBox(height: 16),
           const Text('Or scan to connect your wallet'),
-          IconButton(
+          /*IconButton(
             tooltip: "QR Code",
             padding: const EdgeInsets.all(0),
             icon: QrImage(
@@ -107,7 +151,7 @@ class _BottomQrModal extends HookWidget {
             iconSize: 200,
             onPressed: () =>
                 Clipboard.setData(ClipboardData(text: wallet.displayUri)),
-          ),
+          ),*/
           const Text('Tap to copy to clipboard.'),
           const SizedBox(height: 32),
         ],
