@@ -39,7 +39,6 @@ class LoginPage extends HookWidget {
               ElevatedButton(
                 child: const Text('Connect Wallet'),
                 onPressed: () async {
-                  print('onpress')
                   showModalBottomSheet<void>(
                     context: context,
                     builder: (BuildContext context) => const _BottomQrModal(),
@@ -65,19 +64,21 @@ class LoginPage extends HookWidget {
                 onPressed: () async {
                   try {
                     print('Creating a random wallet...');
-                    var wallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
-                    print('Wallet created with address: ${await wallet.address}');
+                    var signer = EthPrivateKey.createRandom(Random.secure()).asSigner();
+                    print('Wallet created with address: ${await signer.address}');
                     print('Authorizing the wallet...');
-                    bool isAuthorized = await session.authorize(wallet);
+                    bool isAuthorized = await session.authorize(signer);
                     print('Wallet authorized: $isAuthorized');
                     print(context);
-                    context.goNamed('home');
                     print('Session: $session');
                     print('Context: $context');
                     context.goNamed('home');
                     print('Navigation to home completed.');
                   } catch (e) {
                     print('Errorf: $e');
+                  } finally {
+                    print('Finally');
+                    context.goNamed('home');
                   }
                 },
               ),
@@ -86,7 +87,7 @@ class LoginPage extends HookWidget {
                 onPressed: () async {
                   try {
                     print('Creating a random wallet...');
-                    var wallet = EthPrivateKey.fromHex('key').asSigner();
+                    var wallet = EthPrivateKey.fromHex('953bcdf6bbb41880dcc2f78d7a29b922aff84b4278ff6f5126e99e35417cf720').asSigner();
                     print('Wallet created with address: ${await wallet.address}');
                     print('Authorizing the wallet...');
                     await session.authorize(wallet);
@@ -139,10 +140,10 @@ class _BottomQrModal extends HookWidget {
           ),
           const SizedBox(height: 16),
           const Text('Or scan to connect your wallet'),
-          /*IconButton(
+          IconButton(
             tooltip: "QR Code",
             padding: const EdgeInsets.all(0),
-            icon: QrImage(
+            icon: QrImageView(
               data: wallet.displayUri,
               version: QrVersions.auto,
               // foregroundColor: Colors.deepPurple.shade900,
@@ -151,7 +152,7 @@ class _BottomQrModal extends HookWidget {
             iconSize: 200,
             onPressed: () =>
                 Clipboard.setData(ClipboardData(text: wallet.displayUri)),
-          ),*/
+          ),
           const Text('Tap to copy to clipboard.'),
           const SizedBox(height: 32),
         ],
