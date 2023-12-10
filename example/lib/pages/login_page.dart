@@ -28,6 +28,11 @@ class LoginPage extends HookWidget {
   @override
   Widget build(BuildContext context) {
     useListenable(wallet);
+        session.addListener(() {
+      if (session.initialized) {
+        context.goNamed('home');
+      }
+    });
     return Scaffold(
       body: Container(
         padding: const EdgeInsets.all(16),
@@ -87,7 +92,7 @@ class LoginPage extends HookWidget {
                 onPressed: () async {
                   try {
                     print('Creating a random wallet...');
-                    var wallet = EthPrivateKey.fromHex('953bcdf6bbb41880dcc2f78d7a29b922aff84b4278ff6f5126e99e35417cf720').asSigner();
+                    var wallet = EthPrivateKey.fromHex('your_private_key').asSigner();
                     print('Wallet created with address: ${await wallet.address}');
                     print('Authorizing the wallet...');
                     await session.authorize(wallet);
