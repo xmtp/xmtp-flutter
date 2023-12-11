@@ -68,17 +68,9 @@ class LoginPage extends HookWidget {
                 child: const Text('Create Random Wallet'),
                 onPressed: () async {
                   try {
-                    print('Creating a random wallet...');
                     var signer = EthPrivateKey.createRandom(Random.secure()).asSigner();
-                    print('Wallet created with address: ${await signer.address}');
-                    print('Authorizing the wallet...');
-                    bool isAuthorized = await session.authorize(signer);
-                    print('Wallet authorized: $isAuthorized');
-                    print(context);
-                    print('Session: $session');
-                    print('Context: $context');
+                    await session.authorize(signer);
                     context.goNamed('home');
-                    print('Navigation to home completed.');
                   } catch (e) {
                     print('Errorf: $e');
                   } finally {
@@ -91,15 +83,9 @@ class LoginPage extends HookWidget {
                 child: const Text('Start from Private Key'),
                 onPressed: () async {
                   try {
-                    print('Creating a random wallet...');
                     var wallet = EthPrivateKey.fromHex('your_private_key').asSigner();
-                    print('Wallet created with address: ${await wallet.address}');
-                    print('Authorizing the wallet...');
                     await session.authorize(wallet);
-                    print('Wallet authorized.');
-                    print('Navigating to home...');
                     context.goNamed('home');
-                    print('Navigation to home completed.');
                   } catch (e) {
                     print('Errorf: $e');
                   }
