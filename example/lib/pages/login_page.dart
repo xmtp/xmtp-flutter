@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:web3dart/web3dart.dart';
 import 'package:go_router/go_router.dart';
+import 'package:xmtp/xmtp.dart' as xmtp;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import "dart:math";
 
 import '../session/foreground_session.dart';
 import '../wallet.dart';
@@ -25,6 +28,11 @@ class LoginPage extends HookWidget {
   @override
   Widget build(BuildContext context) {
     useListenable(wallet);
+        session.addListener(() {
+      if (session.initialized) {
+        context.goNamed('home');
+      }
+    });
     return Scaffold(
       body: Container(
         padding: const EdgeInsets.all(16),
@@ -52,6 +60,31 @@ class LoginPage extends HookWidget {
                     context.goNamed('home');
                   } catch (err) {
                     Navigator.pop(context);
+                  }
+                },
+              ),
+              
+              ElevatedButton(
+                child: const Text('Create Random Wallet'),
+                onPressed: () async {
+                  try {
+                    var signer = EthPrivateKey.createRandom(Random.secure()).asSigner();
+                    await session.authorize(signer);
+                    context.goNamed('home');
+                  } catch (e) {
+                    print('Errorf: $e');
+                  } 
+                },
+              ),
+              ElevatedButton(
+                child: const Text('Start from Private Key'),
+                onPressed: () async {
+                  try {
+                    var wallet = EthPrivateKey.fromHex('your_private_key').asSigner();
+                    await session.authorize(wallet);
+                    context.goNamed('home');
+                  } catch (e) {
+                    print('Errorf: $e');
                   }
                 },
               ),
@@ -98,7 +131,7 @@ class _BottomQrModal extends HookWidget {
           IconButton(
             tooltip: "QR Code",
             padding: const EdgeInsets.all(0),
-            icon: QrImage(
+            icon: QrImageView(
               data: wallet.displayUri,
               version: QrVersions.auto,
               // foregroundColor: Colors.deepPurple.shade900,
