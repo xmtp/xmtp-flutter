@@ -73,10 +73,7 @@ class LoginPage extends HookWidget {
                     context.goNamed('home');
                   } catch (e) {
                     print('Errorf: $e');
-                  } finally {
-                    print('Finally');
-                    context.goNamed('home');
-                  }
+                  } 
                 },
               ),
               ElevatedButton(
