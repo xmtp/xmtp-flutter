@@ -28,9 +28,3 @@ doc/api/
 *.js_
 *.js.deps
 *.js.map
-
-# example
-example/linux
-example/macos
-example/windows
-example/web
