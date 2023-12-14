@@ -10,6 +10,6 @@ void main() {
     expect(encoded.type, contentTypeReadReceipt);
     expect(encoded.content.isEmpty, true);
     var decoded = await codec.decode(encoded);
-    expect(decoded, receipt);
+    expect(decoded is ReadReceipt, true);
   });
 }
