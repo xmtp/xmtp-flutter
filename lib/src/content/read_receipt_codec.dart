@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import '../../xmtp.dart';
 import 'codec.dart';
@@ -11,11 +12,7 @@ final contentTypeReadReceipt = xmtp.ContentTypeId(
   versionMinor: 0,
 );
 
-class ReadReceipt {
-  String timestamp;
-
-  ReadReceipt(this.timestamp);
-}
+class ReadReceipt {}
 
 class ReadReceiptCodec extends Codec<ReadReceipt> {
   @override
@@ -23,19 +20,18 @@ class ReadReceiptCodec extends Codec<ReadReceipt> {
 
   @override
   Future<ReadReceipt> decode(EncodedContent encoded) async {
-    var timestamp = encoded.parameters['timestamp'];
-    if (timestamp == null) {
-      throw StateError("Invalid Content");
-    }
-    return ReadReceipt(timestamp);
+    return ReadReceipt();
   }
 
   @override
   Future<xmtp.EncodedContent> encode(ReadReceipt decoded) async =>
       xmtp.EncodedContent(
         type: contentTypeReadReceipt,
-        parameters: {'timestamp': decoded.timestamp},
-        content: utf8.encode(decoded.timestamp),
+        content: Uint8List.fromList([]),
       );
 
+  @override
+  String? fallback(ReadReceipt content) {
+    return null;
+  }
 }
