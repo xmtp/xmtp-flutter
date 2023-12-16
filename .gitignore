@@ -30,6 +30,7 @@ doc/api/
 *.js.map
 
 **/.DS_Store
+.DS_Store
 example/linux
 example/macos
 example/windows
