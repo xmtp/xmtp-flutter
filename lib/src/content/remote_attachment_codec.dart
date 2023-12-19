@@ -3,6 +3,7 @@ import 'codec.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:crypto/crypto.dart';
 
 class EncryptedEncodedContent {
   final String contentDigest;
@@ -17,6 +18,12 @@ class EncryptedEncodedContent {
       this.nonce, this.payload, this.contentLength, this.fileName);
 
   EncodedContent decryptEncoded(EncryptedEncodedContent encrypted) {
+    var hashPayload = sha256.convert(encrypted.payload);
+    if (hashPayload.toString() != encrypted.contentDigest) {
+      throw Exception("content digest does not match");
+    }
+
+    
     return EncodedContent.create();
   }
 }
