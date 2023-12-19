@@ -15,6 +15,10 @@ class EncryptedEncodedContent {
 
   EncryptedEncodedContent(this.contentDigest, this.secret, this.salt,
       this.nonce, this.payload, this.contentLength, this.fileName);
+
+  EncodedContent decryptEncoded(EncryptedEncodedContent encrypted) {
+    return EncodedContent.create();
+  }
 }
 
 class RemoteAttachment {
@@ -26,10 +30,10 @@ class RemoteAttachment {
   final String scheme;
   final int contentLength;
   final String fileName;
-  final Fetcher fetcher;
+  final Fetcher fetcher = HttpFetcher();
 
   RemoteAttachment(this.url, this.contentDigest, this.secret, this.salt,
-      this.nonce, this.scheme, this.contentLength, this.fileName, this.fetcher);
+      this.nonce, this.scheme, this.contentLength, this.fileName);
 }
 
 abstract class Fetcher {
@@ -59,13 +63,12 @@ class RemoteAttachmentCodec extends Codec<RemoteAttachment> {
       RemoteAttachment(
           Uri.parse(encoded.content.toString()),
           encoded.parameters["contentDigest"] ?? "",
-          secret,
-          salt,
-          nonce,
-          scheme,
+          Uint8List.fromList((encoded.parameters["secret"] ?? "").codeUnits),
+          Uint8List.fromList((encoded.parameters["salt"] ?? "").codeUnits),
+          Uint8List.fromList((encoded.parameters["nonce"] ?? "").codeUnits),
+          encoded.parameters["scheme"] ?? "",
           int.parse(encoded.parameters["contentLength"] ?? ""),
           encoded.parameters["filename"] ?? "",
-          fetcher
       );
 
   @override
