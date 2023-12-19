@@ -16,16 +16,6 @@ class EncryptedEncodedContent {
 
   EncryptedEncodedContent(this.contentDigest, this.secret, this.salt,
       this.nonce, this.payload, this.contentLength, this.fileName);
-
-  EncodedContent decryptEncoded(EncryptedEncodedContent encrypted) {
-    var hashPayload = sha256.convert(encrypted.payload);
-    if (hashPayload.toString() != encrypted.contentDigest) {
-      throw Exception("content digest does not match");
-    }
-
-    
-    return EncodedContent.create();
-  }
 }
 
 class RemoteAttachment {
@@ -41,6 +31,16 @@ class RemoteAttachment {
 
   RemoteAttachment(this.url, this.contentDigest, this.secret, this.salt,
       this.nonce, this.scheme, this.contentLength, this.fileName);
+
+  EncodedContent decryptEncoded(EncryptedEncodedContent encrypted) {
+    var hashPayload = sha256.convert(encrypted.payload);
+    if (hashPayload.toString() != encrypted.contentDigest) {
+      throw Exception("content digest does not match");
+    }
+
+
+    return EncodedContent.create();
+  }
 }
 
 abstract class Fetcher {
