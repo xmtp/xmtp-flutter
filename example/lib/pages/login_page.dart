@@ -28,11 +28,6 @@ class LoginPage extends HookWidget {
   @override
   Widget build(BuildContext context) {
     useListenable(wallet);
-        session.addListener(() {
-      if (session.initialized) {
-        context.goNamed('home');
-      }
-    });
     return Scaffold(
       body: Container(
         padding: const EdgeInsets.all(16),
