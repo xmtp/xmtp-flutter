@@ -1,6 +1,3 @@
-# Include these when we're ready to add them
-ios/
-android/
 
 # Miscellaneous
 *.class

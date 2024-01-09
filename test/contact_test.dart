@@ -119,7 +119,9 @@ void main() {
         port: 5556,
         isSecure: true,
       );
-      var contacts = ContactManager(api);
+      var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var auth = AuthManager(alice.address, api);
+      var contacts = ContactManager(api, auth);
       for (var address in [
         "0x359B0ceb2daBcBB6588645de3B480c8203aa5b76", // dmccartney.eth
         "0xf0EA7663233F99D0c12370671abBb6Cca980a490", // saulmc.eth
@@ -143,20 +145,175 @@ void main() {
 
   test(
     skip: skipUnlessTestServerEnabled,
+    "consent import / export",
+    () async {
+      // Setup the API client.
+      var api = createTestServerApi();
+      var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var auth = AuthManager(alice.address, api);
+      var contacts = ContactManager(api, auth);
+      await auth.authenticateWithCredentials(alice);
+
+      var allowed1 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var allowed2 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var denied1 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var denied2 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var unknown = EthPrivateKey.createRandom(Random.secure()).asSigner();
+
+      // At first they're all unknown.
+      expect(contacts.checkConsent(denied1.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(denied2.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(allowed1.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(allowed2.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(unknown.address), ContactConsent.unknown);
+
+      await contacts.importConsents(
+        allowedWalletAddresses: [
+          allowed1.address.hexEip55,
+          allowed2.address.hexEip55,
+        ],
+        deniedWalletAddresses: [
+          denied1.address.hexEip55,
+          denied2.address.hexEip55,
+        ],
+      );
+
+      // After importing the known consents are present.
+      expect(contacts.checkConsent(denied1.address), ContactConsent.deny);
+      expect(contacts.checkConsent(denied2.address), ContactConsent.deny);
+      expect(contacts.checkConsent(allowed1.address), ContactConsent.allow);
+      expect(contacts.checkConsent(allowed2.address), ContactConsent.allow);
+      expect(contacts.checkConsent(unknown.address), ContactConsent.unknown);
+
+      // When we deny the unknown address, then it becomes denied.
+      await contacts.deny(auth.keys, unknown.address);
+
+      expect(contacts.checkConsent(unknown.address), ContactConsent.deny);
+
+      // And the export should include them all.
+      var export = contacts.exportConsents();
+      expect(export.lastRefreshedAt, isNull);
+      expect(
+          export.allowed.walletAddresses..sort(),
+          [
+            allowed1.address.hexEip55,
+            allowed2.address.hexEip55,
+          ]..sort());
+      expect(
+          export.denied.walletAddresses..sort(),
+          [
+            denied1.address.hexEip55,
+            denied2.address.hexEip55,
+            unknown.address.hexEip55,
+          ]..sort());
+    },
+  );
+
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "consent publishing / refreshing",
+    () async {
+      // Setup the API client.
+      var api = createTestServerApi();
+      var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var auth = AuthManager(alice.address, api);
+      var contacts = ContactManager(api, auth);
+      await auth.authenticateWithCredentials(alice);
+
+      var allowed1 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var allowed2 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var denied1 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var denied2 = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var unknown = EthPrivateKey.createRandom(Random.secure()).asSigner();
+
+      // At first they're all unknown.
+      expect(contacts.checkConsent(denied1.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(denied2.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(allowed1.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(allowed2.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(unknown.address), ContactConsent.unknown);
+
+      // Then after we have allowed/denied them, they become known.
+      await contacts.deny(auth.keys, denied1.address);
+      await contacts.deny(auth.keys, denied2.address);
+      await contacts.allow(auth.keys, allowed1.address);
+      await contacts.allow(auth.keys, allowed2.address);
+      expect(contacts.checkConsent(denied1.address), ContactConsent.deny);
+      expect(contacts.checkConsent(denied2.address), ContactConsent.deny);
+      expect(contacts.checkConsent(allowed1.address), ContactConsent.allow);
+      expect(contacts.checkConsent(allowed2.address), ContactConsent.allow);
+      expect(contacts.checkConsent(unknown.address), ContactConsent.unknown);
+
+      // And if we reset the session, they start out unknown again:
+      contacts = ContactManager(api, auth);
+
+      // Note: this assumes we didn't import any consents (see import/export tests).
+      expect(contacts.checkConsent(denied1.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(denied2.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(allowed1.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(allowed2.address), ContactConsent.unknown);
+      expect(contacts.checkConsent(unknown.address), ContactConsent.unknown);
+
+      // But after we refresh, they become known again:
+      await contacts.refreshConsents(auth.keys);
+
+      expect(contacts.checkConsent(denied1.address), ContactConsent.deny);
+      expect(contacts.checkConsent(denied2.address), ContactConsent.deny);
+      expect(contacts.checkConsent(allowed1.address), ContactConsent.allow);
+      expect(contacts.checkConsent(allowed2.address), ContactConsent.allow);
+      expect(contacts.checkConsent(unknown.address), ContactConsent.unknown);
+    },
+  );
+
+  test(
+    "consent serialization",
+    () async {
+      var allow1 = EthPrivateKey.createRandom(Random.secure()).address.hexEip55;
+      var allow2 = EthPrivateKey.createRandom(Random.secure()).address.hexEip55;
+      var deny1 = EthPrivateKey.createRandom(Random.secure()).address.hexEip55;
+      var deny2 = EthPrivateKey.createRandom(Random.secure()).address.hexEip55;
+      var yesterday = DateTime.now().subtract(const Duration(days: 1));
+
+      // Test round-trip write/read of the compact consents.
+      var before = CompactConsents(
+        xmtp.PrivatePreferencesAction_Allow(
+          walletAddresses: [allow1, allow2],
+        ),
+        xmtp.PrivatePreferencesAction_Block(
+          walletAddresses: [deny1, deny2],
+        ),
+        yesterday,
+      );
+
+      var buff = before.writeToBuffer();
+
+      var after = CompactConsents.fromBuffer(buff);
+
+      expect(after.allowed.walletAddresses, [allow1, allow2]..sort());
+      expect(after.denied.walletAddresses, [deny1, deny2]..sort());
+      expect(
+        after.lastRefreshedAt!.millisecondsSinceEpoch,
+        yesterday.millisecondsSinceEpoch,
+      );
+    },
+  );
+
+  test(
+    skip: skipUnlessTestServerEnabled,
     "contact creation / loading",
     () async {
       // Setup the API client.
       var api = createTestServerApi();
-      var contacts = ContactManager(api);
       var alice = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var auth = AuthManager(alice.address, api);
+      var contacts = ContactManager(api, auth);
 
       // First lookup if she has a contact (i.e. if she has an account)
       var stored = await contacts.getUserContacts(alice.address.hexEip55);
       expect(stored.length, 0); // nope, no account
 
       // So we create an identity and authenticate
-      var keys = await AuthManager(alice.address, api)
-          .authenticateWithCredentials(alice);
+      var keys = await auth.authenticateWithCredentials(alice);
 
       // And then we save the contact for that new identity.
       await contacts.saveContact(keys);

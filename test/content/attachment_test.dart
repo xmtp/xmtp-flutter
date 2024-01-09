@@ -6,8 +6,8 @@ void main() {
   test('attached file should be encoded and decoded', () async {
     var codec = AttachmentCodec();
 
-    var encoded = await codec.encode(
-        Attachment("file.bin", "application/octet-stream", [3, 2, 1]));
+    var encoded = await codec
+        .encode(Attachment("file.bin", "application/octet-stream", [3, 2, 1]));
     expect(encoded.type, contentTypeAttachment);
     expect(encoded.content.isNotEmpty, true);
     var decoded = await codec.decode(encoded);
