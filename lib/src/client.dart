@@ -72,6 +72,11 @@ class Client implements Codec<DecodedContent> {
   final AuthManager _auth;
   final ContactManager _contacts;
   final CodecRegistry _codecs;
+  static CodecRegistry get codecs {
+    CodecRegistry registry = CodecRegistry();
+    registry.registerCodec(TextCodec());
+    return registry;
+  }
 
   Client._(
     this.address,

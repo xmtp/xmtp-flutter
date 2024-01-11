@@ -1,6 +1,7 @@
 import 'package:cryptography/cryptography.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:xmtp/src/common/crypto.dart';
+import 'package:xmtp/src/content/encoded_content_ext.dart';
 
 import '../../xmtp.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
@@ -34,11 +35,22 @@ class RemoteAttachment {
   RemoteAttachment(this.url, this.contentDigest, this.secret, this.salt,
       this.nonce, this.scheme, this.contentLength, this.fileName);
 
+  dynamic load() async {
+    var payload = await fetcher.fetch(url);
+    if (payload.isEmpty) {
+      throw StateError("No remote attachment payload");
+    }
+    var encrypted = EncryptedEncodedContent(
+        contentDigest, secret, salt, nonce, payload, contentLength, fileName);
+    var decrypted = await decryptEncoded(encrypted);
+    return decrypted.decoded;
+  }
+
   static Future<EncodedContent> decryptEncoded(
       EncryptedEncodedContent encrypted) async {
     var hashPayload = sha256(encrypted.payload);
     if (bytesToHex(hashPayload) != encrypted.contentDigest) {
-      throw Exception("content digest does not match");
+      throw StateError("content digest does not match");
     }
 
     var aes = Ciphertext_Aes256gcmHkdfsha256(
