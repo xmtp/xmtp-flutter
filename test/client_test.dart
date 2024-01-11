@@ -42,15 +42,25 @@ void main() {
       var bobChats = await bob.listConversations();
       expect(aliceChats.length, 0);
       expect(bobChats.length, 0);
+      expect(alice.checkContactConsent(bobAddress), ContactConsent.unknown);
+      expect(bob.checkContactConsent(aliceAddress), ContactConsent.unknown);
 
       var aliceConvo = await alice.newConversation(bobAddress);
-      var bobConvo = await bob.newConversation(aliceAddress);
-
       var aliceMessages = await alice.listMessages(aliceConvo);
-      var bobMessages = await alice.listMessages(bobConvo);
 
+      // Alice started the conversation so she implicitly allowed the contact.
       expect(aliceMessages.length, 0);
+      expect(alice.checkContactConsent(bobAddress), ContactConsent.allow);
+
+      // Bob can see the conversation but hasn't received any messages yet.
+      // And he has neither denied nor allowed the contact.
+      var bobConvos = (await bob.listConversations());
+      var bobConvo = bobConvos[0];
+      var bobMessages = await bob.listMessages(bobConvo);
+      expect(bobConvos.length, 1);
+      expect(bobConvo.peer, alice.address);
       expect(bobMessages.length, 0);
+      expect(bob.checkContactConsent(aliceAddress), ContactConsent.unknown);
 
       // Bob starts listening to the stream and recording the transcript.
       var transcript = [];
@@ -64,8 +74,11 @@ void main() {
       await delayToPropagate();
 
       // It gets added to both of their conversation lists with that first msg.
+      // But Bob still hasn't allowed the contact.
       expect((await alice.listConversations()).length, 1);
       expect((await bob.listConversations()).length, 1);
+      expect(alice.checkContactConsent(bobAddress), ContactConsent.allow);
+      expect(bob.checkContactConsent(aliceAddress), ContactConsent.unknown);
 
       // And Bob see the message in the conversation.
       bobMessages = await bob.listMessages(bobConvo);
@@ -74,8 +87,11 @@ void main() {
       expect(bobMessages[0].content, "hello Bob, it's me Alice!");
 
       // Bob replies
+      // Which now implicitly gives Bob's consent to allow the contact.
       await bob.sendMessage(bobConvo, "oh, hello Alice!");
       await delayToPropagate();
+      expect(alice.checkContactConsent(bobAddress), ContactConsent.allow);
+      expect(bob.checkContactConsent(aliceAddress), ContactConsent.allow);
 
       // Bob sends an already-encoded message
       await bob.sendMessageEncoded(

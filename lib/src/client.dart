@@ -196,8 +196,13 @@ class Client implements Codec<DecodedContent> {
     String address, {
     String conversationId = "",
     Map<String, String> metadata = const <String, String>{},
-  }) =>
-      _conversations.newConversation(address, conversationId, metadata);
+  }) async {
+    // Starting a conversation implies allowing an unknown contact.
+    if (checkContactConsent(address) == ContactConsent.unknown) {
+      await allowContact(address);
+    }
+    return _conversations.newConversation(address, conversationId, metadata);
+  }
 
   /// Whether or not we can send messages to [address].
   ///
@@ -316,12 +321,17 @@ class Client implements Codec<DecodedContent> {
     Object content, {
     xmtp.ContentTypeId? contentType,
     // TODO: support fallback and compression
-  }) =>
-      _conversations.sendMessage(
-        conversation,
-        content,
-        contentType: contentType,
-      );
+  }) async {
+    // Sending a message implies allowing an unknown contact.
+    if (checkContactConsent(conversation.peer.hex) == ContactConsent.unknown) {
+      await allowContact(conversation.peer.hex);
+    }
+    return _conversations.sendMessage(
+      conversation,
+      content,
+      contentType: contentType,
+    );
+  }
 
   /// This sends the already [encoded] message to the [conversation].
   /// This is identical to [sendMessage] but can be helpful when you
