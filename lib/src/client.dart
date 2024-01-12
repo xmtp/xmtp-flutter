@@ -73,9 +73,13 @@ class Client implements Codec<DecodedContent> {
   final ContactManager _contacts;
   final CodecRegistry _codecs;
   static final CodecRegistry _codecRegistry = CodecRegistry();
+
   static CodecRegistry get codecs => _codecRegistry;
+
   static void registerCodecs(List<Codec> codecList) {
-    for (var codec in codecList) { _codecRegistry.registerCodec(codec); }
+    for (var codec in codecList) {
+      _codecRegistry.registerCodec(codec);
+    }
   }
 
   Client._(
