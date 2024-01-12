@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:xmtp/xmtp.dart';
-import 'dart:convert';
 
 extension EncodedDecompressExt on EncodedContent {
   dynamic decoded() {
@@ -43,8 +42,6 @@ extension EncodedDecompressExt on EncodedContent {
     }
     return copy;
   }
-
-
 }
 
 enum EncodedContentCompression {
