@@ -26,15 +26,14 @@ extension on xmtp.ContentTypeId {
 
 /// This is a [Codec] that encodes a reply to another message.
 class ReplyCodec extends NestedContentCodec<Reply> {
-
   @override
   xmtp.ContentTypeId get contentType => contentTypeReply;
 
   @override
   Future<Reply> decode(xmtp.EncodedContent encoded) async => Reply(
-    encoded.parameters["reference"] ?? "",
-    await registry.decode(xmtp.EncodedContent.fromBuffer(encoded.content)),
-  );
+        encoded.parameters["reference"] ?? "",
+        await registry.decode(xmtp.EncodedContent.fromBuffer(encoded.content)),
+      );
 
   @override
   Future<xmtp.EncodedContent> encode(Reply decoded) async =>

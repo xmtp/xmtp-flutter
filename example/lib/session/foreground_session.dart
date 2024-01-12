@@ -126,12 +126,13 @@ class ForegroundSession extends ChangeNotifier {
       var prefs = await SharedPreferences.getInstance();
       var api = createApi();
       var client = await xmtp.Client.createFromWallet(api, wallet);
+      me = client.keys.wallet; // Update the wallet address
+      initialized = true; // Update the session state
+
       await prefs.setString("xmtp.keys", client.keys.writeToJson());
       await XmtpIsolate.spawn(client.keys);
+      notifyListeners();
 
-      me = client.keys.wallet;  // Update the wallet address
-      initialized = true;  // Update the session state
-   
       return true;
     } catch (err) {
       return false;

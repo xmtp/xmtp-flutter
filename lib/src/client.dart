@@ -123,7 +123,6 @@ class Client implements Codec<DecodedContent> {
     List<Codec> customCodecs,
   ) async {
     var auth = AuthManager(address, api);
-    var contacts = ContactManager(api);
     var codecs = CodecRegistry();
     var commonCodecs = <Codec>[
       TextCodec(),
@@ -138,6 +137,7 @@ class Client implements Codec<DecodedContent> {
       }
       codecs.registerCodec(codec);
     }
+    var contacts = ContactManager(api, auth);
     var v1 = ConversationManagerV1(address, api, auth, codecs, contacts);
     var v2 = ConversationManagerV2(address, api, auth, codecs, contacts);
     var conversations = ConversationManager(address, contacts, v1, v2);
@@ -201,8 +201,13 @@ class Client implements Codec<DecodedContent> {
     String address, {
     String conversationId = "",
     Map<String, String> metadata = const <String, String>{},
-  }) =>
-      _conversations.newConversation(address, conversationId, metadata);
+  }) async {
+    // Starting a conversation implies allowing an unknown contact.
+    if (checkContactConsent(address) == ContactConsent.unknown) {
+      await allowContact(address);
+    }
+    return _conversations.newConversation(address, conversationId, metadata);
+  }
 
   /// Whether or not we can send messages to [address].
   ///
@@ -211,6 +216,51 @@ class Client implements Codec<DecodedContent> {
   Future<bool> canMessage(String address) async =>
       EthereumAddress.fromHex(address) != this.address &&
       await _contacts.hasUserContacts(address);
+
+  /// Indicate that the user does not want to be contacted by [address].
+  /// This will be published to the network and added to the local cache.
+  Future<bool> denyContact(String address) async =>
+      _contacts.deny(_auth.keys, EthereumAddress.fromHex(address));
+
+  /// Indicate that the user does want to be contacted by [address].
+  /// This will be published to the network and added to the local cache.
+  Future<bool> allowContact(String address) async =>
+      _contacts.allow(_auth.keys, EthereumAddress.fromHex(address));
+
+  /// Look-up existing consent for the current user to allow or block [address].
+  /// This uses the local cache of contact consent preferences.
+  ///   See [refreshContactConsentPreferences] to refresh the cache.
+  ///   See [allowContact] and [blockContact] to modify consent.
+  ContactConsent checkContactConsent(String address) =>
+      _contacts.checkConsent(EthereumAddress.fromHex(address));
+
+  /// Export consents from the local cache for use in a future session.
+  /// This aims to allow apps to have immediate access to prior consents
+  /// even before the device has network connectivity in a future session.
+  CompactConsents exportContactConsents() => _contacts.exportConsents();
+
+  /// Import consents from a prior session to the local cache.
+  /// This will not publish them to the network. Instead, this aims to
+  /// allow apps to have immediate access to prior consents even before
+  /// the device has network connectivity.
+  Future<bool> importContactConsents({
+    Iterable<String> allowedWalletAddresses = const [],
+    Iterable<String> deniedWalletAddresses = const [],
+    DateTime? lastRefreshedAt,
+  }) =>
+      _contacts.importConsents(
+        allowedWalletAddresses: allowedWalletAddresses,
+        deniedWalletAddresses: deniedWalletAddresses,
+        lastRefreshedAt: lastRefreshedAt,
+      );
+
+  /// Refresh the local cache of contact consent preferences.
+  /// When [fullRefresh] is true then this will rebuild the local cache
+  /// by fetching the full history of consent actions.
+  /// When [fullRefresh] is false then this will only fetch consent actions
+  /// newer than the latest in the cache.
+  Future<bool> refreshContactConsentPreferences({bool fullRefresh = false}) =>
+      _contacts.refreshConsents(_auth.keys, fullRefresh: fullRefresh);
 
   /// This lists messages sent to the [conversation].
   ///
@@ -276,12 +326,17 @@ class Client implements Codec<DecodedContent> {
     Object content, {
     xmtp.ContentTypeId? contentType,
     // TODO: support fallback and compression
-  }) =>
-      _conversations.sendMessage(
-        conversation,
-        content,
-        contentType: contentType,
-      );
+  }) async {
+    // Sending a message implies allowing an unknown contact.
+    if (checkContactConsent(conversation.peer.hex) == ContactConsent.unknown) {
+      await allowContact(conversation.peer.hex);
+    }
+    return _conversations.sendMessage(
+      conversation,
+      content,
+      contentType: contentType,
+    );
+  }
 
   /// This sends the already [encoded] message to the [conversation].
   /// This is identical to [sendMessage] but can be helpful when you
@@ -345,6 +400,5 @@ class Client implements Codec<DecodedContent> {
   /// This may provide text that can be displayed instead of the content.
   /// It can be used in contexts that do not support rendering a content type.
   @override
-  String? fallback(DecodedContent content) =>
-      _codecs.fallback(content);
+  String? fallback(DecodedContent content) => _codecs.fallback(content);
 }

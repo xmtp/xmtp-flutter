@@ -1,5 +1,13 @@
 # See https://www.dartlang.org/guides/libraries/private-files
 
+# These are the dynamic edition of the libxmtp bindings.
+# They are used during `flutter test` runs.
+# See tool/test-lib/README.md for details.
+libxmtp_bindings_flutter.dylib
+libxmtp_bindings_flutter.so
+!tool/test-lib/**/libxmtp_bindings_flutter.dylib
+!tool/test-lib/**/libxmtp_bindings_flutter.so
+
 .flutter-plugins
 .flutter-plugins-dependencies
 
@@ -28,3 +36,6 @@ doc/api/
 *.js_
 *.js.deps
 *.js.map
+
+**/.DS_Store
+.DS_Store

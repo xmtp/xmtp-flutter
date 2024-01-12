@@ -28,11 +28,6 @@ class LoginPage extends HookWidget {
   @override
   Widget build(BuildContext context) {
     useListenable(wallet);
-        session.addListener(() {
-      if (session.initialized) {
-        context.goNamed('home');
-      }
-    });
     return Scaffold(
       body: Container(
         padding: const EdgeInsets.all(16),
@@ -63,24 +58,25 @@ class LoginPage extends HookWidget {
                   }
                 },
               ),
-              
               ElevatedButton(
                 child: const Text('Create Random Wallet'),
                 onPressed: () async {
                   try {
-                    var signer = EthPrivateKey.createRandom(Random.secure()).asSigner();
+                    var signer =
+                        EthPrivateKey.createRandom(Random.secure()).asSigner();
                     await session.authorize(signer);
                     context.goNamed('home');
                   } catch (e) {
                     print('Errorf: $e');
-                  } 
+                  }
                 },
               ),
               ElevatedButton(
                 child: const Text('Start from Private Key'),
                 onPressed: () async {
                   try {
-                    var wallet = EthPrivateKey.fromHex('your_private_key').asSigner();
+                    var wallet =
+                        EthPrivateKey.fromHex('your_private_key').asSigner();
                     await session.authorize(wallet);
                     context.goNamed('home');
                   } catch (e) {
@@ -131,7 +127,7 @@ class _BottomQrModal extends HookWidget {
           IconButton(
             tooltip: "QR Code",
             padding: const EdgeInsets.all(0),
-            icon: QrImageView(
+            icon: QrImage(
               data: wallet.displayUri,
               version: QrVersions.auto,
               // foregroundColor: Colors.deepPurple.shade900,

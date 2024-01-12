@@ -20,7 +20,6 @@ final contentTypeComposite = xmtp.ContentTypeId(
 /// composite and serializing/deserializing to the [xmtp.Composite] as
 /// the [content] bytes in a [xmtp.EncodedContent] of type [contentTypeComposite].
 class CompositeCodec extends NestedContentCodec<DecodedComposite> {
-
   @override
   xmtp.ContentTypeId get contentType => contentTypeComposite;
 

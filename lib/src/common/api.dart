@@ -103,7 +103,12 @@ extension QueryPaginator on xmtp.MessageApiClient {
       for (var envelope in res.envelopes) {
         yield envelope;
       }
-      req.pagingInfo.cursor = res.pagingInfo.cursor;
+      // i.e. req.pagingInfo.cursor = res.pagingInfo.cursor;
+      req = xmtp.QueryRequest()
+        ..mergeFromMessage(req)
+        ..pagingInfo = (xmtp.PagingInfo()
+          ..mergeFromMessage(req.pagingInfo)
+          ..cursor = res.pagingInfo.cursor);
     } while (res.envelopes.isNotEmpty && res.pagingInfo.hasCursor());
   }
 

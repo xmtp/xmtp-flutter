@@ -16,6 +16,8 @@ final Wallet wallet = Wallet._().._init();
 /// a new WalletConnect session. Updates for the session will notify
 /// listeners to the [Wallet].
 class Wallet extends ChangeNotifier {
+  /// TODO: replace the example with the official WC v2 package:
+  /// https://github.com/WalletConnect/WalletConnectFlutterV2
   final WalletConnect wc;
   String displayUri = '';
 
