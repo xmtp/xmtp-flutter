@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:cryptography/cryptography.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:xmtp/src/common/crypto.dart';
+import 'package:xmtp/src/content/attachment_codec.dart';
 import 'package:xmtp/src/content/encoded_content_ext.dart';
 
 import '../../xmtp.dart';
@@ -72,14 +75,15 @@ class RemoteAttachment {
     var cipherText = await encrypt(secret, encodedContent.writeToBuffer());
     var contentDigest =
         bytesToHex(sha256(cipherText.aes256GcmHkdfSha256.payload));
+    var fileName = content is Attachment ? content.filename : null;
     return EncryptedEncodedContent(
         contentDigest,
         Uint8List.fromList(secret),
         Uint8List.fromList(cipherText.aes256GcmHkdfSha256.hkdfSalt),
         Uint8List.fromList(cipherText.aes256GcmHkdfSha256.gcmNonce),
         Uint8List.fromList(cipherText.aes256GcmHkdfSha256.payload),
-        null,
-        null);
+        encodedContent.content.length,
+        fileName);
   }
 
   static RemoteAttachment from(
@@ -95,8 +99,8 @@ class RemoteAttachment {
         encryptedEncodedContent.salt,
         encryptedEncodedContent.nonce,
         url.scheme,
-        null,
-        null);
+        encryptedEncodedContent.contentLength,
+        encryptedEncodedContent.fileName);
   }
 }
 
@@ -125,30 +129,31 @@ class RemoteAttachmentCodec extends Codec<RemoteAttachment> {
   @override
   Future<RemoteAttachment> decode(EncodedContent encoded) async =>
       RemoteAttachment(
-        Uri.parse(encoded.content.toString()),
+        Uri.parse(utf8.decode(encoded.content)),
         encoded.parameters["contentDigest"] ?? "",
         Uint8List.fromList((encoded.parameters["secret"] ?? "").codeUnits),
         Uint8List.fromList((encoded.parameters["salt"] ?? "").codeUnits),
         Uint8List.fromList((encoded.parameters["nonce"] ?? "").codeUnits),
         encoded.parameters["scheme"] ?? "",
-        int.parse(encoded.parameters["contentLength"] ?? ""),
+        encoded.content.length,
         encoded.parameters["filename"] ?? "",
       );
 
   @override
   Future<xmtp.EncodedContent> encode(RemoteAttachment decoded) async {
+    var content = Uint8List.fromList(decoded.url.toString().codeUnits);
     var parameters = {
       "contentDigest": decoded.contentDigest,
       "secret": bytesToHex(decoded.secret),
       "salt": bytesToHex(decoded.salt),
       "nonce": bytesToHex(decoded.nonce),
       "scheme": decoded.scheme,
-      "contentLength": decoded.contentLength.toString(),
+      "contentLength": content.length.toString(),
       "filename": decoded.fileName ?? "",
     };
     return EncodedContent(
       type: contentTypeRemoteAttachments,
-      content: Uint8List.fromList(decoded.url.toString().codeUnits),
+      content: content,
       parameters: parameters,
     );
   }
