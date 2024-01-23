@@ -1,5 +1,9 @@
 import 'dart:io';
-import 'package:xmtp/xmtp.dart';
+
+import 'package:xmtp/src/content/attachment_codec.dart';
+import 'package:xmtp/src/content/remote_attachment_codec.dart';
+
+import '../../xmtp.dart';
 
 extension EncodedDecompressExt on EncodedContent {
   dynamic decoded() {
@@ -7,7 +11,10 @@ extension EncodedDecompressExt on EncodedContent {
     if (hasCompression()) {
       encodedContent = decompressContent();
     }
-    return Client.codecs.decode(encodedContent);
+    var codecRegistry = CodecRegistry();
+    codecRegistry.registerCodec(AttachmentCodec());
+    codecRegistry.registerCodec(RemoteAttachmentCodec());
+    return codecRegistry.decode(encodedContent);
   }
 
   EncodedContent compressContent() {

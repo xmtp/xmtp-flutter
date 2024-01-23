@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xmtp/src/content/attachment_codec.dart';
 import 'package:xmtp/src/content/encoded_content_ext.dart';
 import 'package:xmtp/src/content/remote_attachment_codec.dart';
-import 'package:xmtp/xmtp.dart';
 
 void main() {
   test('Remote attachment must be encoded and decoded', () async {
@@ -31,7 +30,6 @@ void main() {
     var encrypted =
         await RemoteAttachment.encodedEncrypted(attachment, AttachmentCodec());
     var decrypted = await RemoteAttachment.decryptEncoded(encrypted);
-    Client.registerCodecs([RemoteAttachmentCodec(), AttachmentCodec()]);
     var decoded = await decrypted.decoded();
     expect(attachment.filename, (decoded.content as Attachment).filename);
     expect(attachment.mimeType, (decoded.content as Attachment).mimeType);
@@ -41,7 +39,6 @@ void main() {
   test('Cannot use non https url', () async {
     var attachment =
         Attachment("test.txt", "text/plain", utf8.encode("Hello world"));
-    Client.registerCodecs([RemoteAttachmentCodec(), AttachmentCodec()]);
     var encryptedEncodedContent =
         await RemoteAttachment.encodedEncrypted(attachment, AttachmentCodec());
     final file = File("abcdefg");
