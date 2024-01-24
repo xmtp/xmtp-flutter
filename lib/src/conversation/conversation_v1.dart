@@ -166,6 +166,21 @@ class ConversationManagerV1 {
         .map((msg) => msg!);
   }
 
+  Stream<DecodedMessage> streamEphemeralMessages(
+      Iterable<Conversation> conversations) {
+    if (conversations.isEmpty) {
+      return const Stream.empty();
+    }
+    return _api.client
+        .subscribe(xmtp.SubscribeRequest(
+            contentTopics: conversations.map((c) => c.ephemeralTopic)))
+        .map((e) => xmtp.Message.fromBuffer(e.message))
+        .asyncMap((msg) => _decodedFromMessage(msg))
+        // Remove nulls (which are discarded bad envelopes).
+        .where((msg) => msg != null)
+        .map((msg) => msg!);
+  }
+
   /// This decrypts and decodes the [xmtp.Message].
   ///
   /// It returns `null` when the message could not be decoded.
@@ -193,16 +208,18 @@ class ConversationManagerV1 {
     Conversation conversation,
     Object content, {
     xmtp.ContentTypeId? contentType,
+    bool isEphemeral = false,
   }) async {
     contentType ??= contentTypeText;
     var encoded = await _codecs.encode(DecodedContent(contentType, content));
-    var sent = await sendMessageEncoded(conversation, encoded);
+    var sent = await sendMessageEncoded(conversation, encoded, isEphemeral);
     return sent!;
   }
 
   Future<DecodedMessage?> sendMessageEncoded(
     Conversation conversation,
     xmtp.EncodedContent encoded,
+    bool isEphemeral,
   ) async {
     var peerContact = await _contacts.getUserContactV1(conversation.peer.hex);
     var encrypted = await encryptMessageV1(
@@ -217,7 +234,8 @@ class ConversationManagerV1 {
     }
     await _api.client.publish(xmtp.PublishRequest(envelopes: [
       xmtp.Envelope(
-        contentTopic: conversation.topic,
+        contentTopic:
+            isEphemeral ? conversation.ephemeralTopic : conversation.topic,
         timestampNs: nowNs(),
         message: msg.writeToBuffer(),
       ),
