@@ -463,6 +463,58 @@ void main() {
     },
   );
 
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "codecs: sending and streaming ephemeral messages",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var bobApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+      await delayToPropagate();
+
+      // Alice starts a conversation w/ Bob
+      var convo = await alice.newConversation(bob.address.hex);
+      await delayToPropagate();
+      await alice.sendMessage(convo, "Hello");
+      await delayToPropagate();
+
+      // Bob should see that first message.
+      expect((await bob.listMessages(convo)).map((m) => m.content).toList(), [
+        "Hello",
+      ]);
+
+      // Bob starts listening to the stream of ephemera.
+      var ephemera = [];
+      var bobListening = bob
+          .streamEphemeralMessages(convo)
+          .listen((msg) => ephemera.add('${msg.sender.hex}> ${msg.content}'));
+      await delayToPropagate();
+
+      // Alice sends an ephemeral "typing..." indicator (text for now)
+      await alice.sendMessage(convo, "typing...", isEphemeral: true);
+      await delayToPropagate();
+
+      // Bob should see the ephemeral indicator
+      expect(ephemera, [
+        "${alice.address.hex}> typing...",
+      ]);
+
+      // Then Alice sends the actual message she typed.
+      await alice.sendMessage(convo, "I'm hungry, let's get lunch");
+      await delayToPropagate();
+
+      // And Bob should now see those two messages (w/o the ephemera)
+      expect((await bob.listMessages(convo)).map((m) => m.content).toList(), [
+        "I'm hungry, let's get lunch",
+        "Hello",
+      ]);
+      await bobListening.cancel();
+    },
+  );
+
   // This uses a custom codec to send integers between two people.
   test(
     skip: skipUnlessTestServerEnabled,

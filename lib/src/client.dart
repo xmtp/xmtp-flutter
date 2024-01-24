@@ -307,6 +307,15 @@ class Client implements Codec<DecodedContent> {
   Stream<DecodedMessage> streamMessages(Conversation conversation) =>
       _conversations.streamMessages([conversation]);
 
+  /// This exposes a stream of ephemeral messages sent to the [conversation].
+  Stream<DecodedMessage> streamEphemeralMessages(Conversation conversation) =>
+      _conversations.streamEphemeralMessages([conversation]);
+
+  /// This exposes a stream of ephemeral messages sent to any of [conversations].
+  Stream<DecodedMessage> streamBatchEphemeralMessages(
+          Iterable<Conversation> conversations) =>
+      _conversations.streamEphemeralMessages(conversations);
+
   /// This exposes a stream of new messages sent to any of the [conversations].
   Stream<DecodedMessage> streamBatchMessages(
           Iterable<Conversation> conversations) =>
@@ -316,10 +325,13 @@ class Client implements Codec<DecodedContent> {
   /// It returns the [DecodedMessage] to simplify optimistic local updates.
   ///  e.g. you can display the [DecodedMessage] immediately
   ///       without having to wait for it to come back down the stream.
+  /// When [isEphemeral] the message is only sent to [streamEphemeralMessages].
+  ///  e.g. so you can send "typing..." or other live indicators
   Future<DecodedMessage> sendMessage(
     Conversation conversation,
     Object content, {
     xmtp.ContentTypeId? contentType,
+    bool isEphemeral = false,
     // TODO: support fallback and compression
   }) async {
     // Sending a message implies allowing an unknown contact.
@@ -330,6 +342,7 @@ class Client implements Codec<DecodedContent> {
       conversation,
       content,
       contentType: contentType,
+      isEphemeral: isEphemeral,
     );
   }
 

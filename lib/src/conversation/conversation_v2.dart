@@ -170,10 +170,11 @@ class ConversationManagerV2 {
     Conversation conversation,
     Object content, {
     xmtp.ContentTypeId? contentType,
+    bool isEphemeral = false,
   }) async {
     contentType ??= contentTypeText;
     var encoded = await _codecs.encode(DecodedContent(contentType, content));
-    var sent = await sendMessageEncoded(conversation, encoded);
+    var sent = await sendMessageEncoded(conversation, encoded, isEphemeral);
     return sent!;
   }
 
@@ -182,6 +183,7 @@ class ConversationManagerV2 {
   Future<DecodedMessage?> sendMessageEncoded(
     Conversation conversation,
     xmtp.EncodedContent encoded,
+    bool isEphemeral,
   ) async {
     var now = nowNs();
     var header = xmtp.MessageHeaderV2(
@@ -193,7 +195,8 @@ class ConversationManagerV2 {
     var dm = xmtp.Message(v2: encrypted);
     await api.client.publish(xmtp.PublishRequest(envelopes: [
       xmtp.Envelope(
-        contentTopic: conversation.topic,
+        contentTopic:
+            isEphemeral ? conversation.ephemeralTopic : conversation.topic,
         timestampNs: now,
         message: dm.writeToBuffer(),
       ),
@@ -249,6 +252,25 @@ class ConversationManagerV2 {
       return const Stream.empty();
     }
     var convoByTopic = {for (var c in conversations) c.topic: c};
+    return api.client
+        .subscribe(xmtp.SubscribeRequest(contentTopics: convoByTopic.keys))
+        .where((e) => convoByTopic.containsKey(e.contentTopic))
+        .asyncMap((e) => _decodedFromMessage(
+              convoByTopic[e.contentTopic]!,
+              xmtp.Message.fromBuffer(e.message),
+            ))
+        // Remove nulls (which are discarded bad envelopes).
+        .where((msg) => msg != null)
+        .map((msg) => msg!);
+  }
+
+  /// This exposes the stream of ephemeral messages in the [conversations].
+  Stream<DecodedMessage> streamEphemeralMessages(
+      Iterable<Conversation> conversations) {
+    if (conversations.isEmpty) {
+      return const Stream.empty();
+    }
+    var convoByTopic = {for (var c in conversations) c.ephemeralTopic: c};
     return api.client
         .subscribe(xmtp.SubscribeRequest(contentTopics: convoByTopic.keys))
         .where((e) => convoByTopic.containsKey(e.contentTopic))

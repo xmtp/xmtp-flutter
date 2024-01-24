@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:quiver/check.dart';
 import 'package:web3dart/credentials.dart';
 import 'package:xmtp_bindings_flutter/xmtp_bindings_flutter.dart';
 
@@ -10,7 +11,9 @@ import 'package:xmtp_bindings_flutter/xmtp_bindings_flutter.dart';
 /// See [EIP 55](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md)
 class Topic {
   /// All topics are in this format.
-  static String _content(String name) => '/xmtp/0/$name/proto';
+  static String _content(String name) => '$_versionPrefix/$name/proto';
+
+  static const String _versionPrefix = "/xmtp/0";
 
   /// This represents direct message conversation between `sender` and `recipient`.
   /// NOTE: the addresses are normalized (EIP-55) and then sorted.
@@ -21,6 +24,18 @@ class Topic {
     ];
     addresses.sort();
     return _content('dm-${addresses.join('-')}');
+  }
+
+  /// This contains ephemeral messages belonging to the `conversationTopic`.
+  /// It knows how to create the ephemeral topic for both v1 and v2.
+  static String ephemeralMessage(String conversationTopic) {
+    checkArgument(
+        conversationTopic.startsWith('$_versionPrefix/dm-') ||
+            conversationTopic.startsWith('$_versionPrefix/m-'),
+        message: 'invalid conversation topic');
+    return conversationTopic
+        .replaceFirst('$_versionPrefix/dm-', '$_versionPrefix/dmE-')
+        .replaceFirst('$_versionPrefix/m-', '$_versionPrefix/mE-');
   }
 
   /// This represents a message conversation.

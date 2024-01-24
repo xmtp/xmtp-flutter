@@ -150,23 +150,38 @@ class ConversationManager {
             conversations.where((c) => c.version == xmtp.Message_Version.v2)),
       ]);
 
+  /// This exposes a stream of ephemeral messages in [conversations].
+  Stream<DecodedMessage> streamEphemeralMessages(
+    Iterable<Conversation> conversations,
+  ) =>
+      StreamGroup.merge([
+        _v1.streamEphemeralMessages(
+            conversations.where((c) => c.version == xmtp.Message_Version.v1)),
+        _v2.streamEphemeralMessages(
+            conversations.where((c) => c.version == xmtp.Message_Version.v2)),
+      ]);
+
   /// This sends [content] as a message to [conversation].
   Future<DecodedMessage> sendMessage(
     Conversation conversation,
     Object content, {
     xmtp.ContentTypeId? contentType,
+    bool isEphemeral = false,
   }) =>
       conversation.version == xmtp.Message_Version.v1
-          ? _v1.sendMessage(conversation, content, contentType: contentType)
-          : _v2.sendMessage(conversation, content, contentType: contentType);
+          ? _v1.sendMessage(conversation, content,
+              contentType: contentType, isEphemeral: isEphemeral)
+          : _v2.sendMessage(conversation, content,
+              contentType: contentType, isEphemeral: isEphemeral);
 
   /// This sends the [encoded] message to the [conversation].
   /// If it cannot be decoded then it still sends but this returns `null`.
   Future<DecodedMessage?> sendMessageEncoded(
     Conversation conversation,
-    xmtp.EncodedContent encoded,
-  ) =>
+    xmtp.EncodedContent encoded, {
+    bool isEphemeral = false,
+  }) =>
       conversation.version == xmtp.Message_Version.v1
-          ? _v1.sendMessageEncoded(conversation, encoded)
-          : _v2.sendMessageEncoded(conversation, encoded);
+          ? _v1.sendMessageEncoded(conversation, encoded, isEphemeral)
+          : _v2.sendMessageEncoded(conversation, encoded, isEphemeral);
 }

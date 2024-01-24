@@ -13,4 +13,32 @@ void main() {
     var identifier = await generateUserPreferencesIdentifier(key);
     expect(identifier, "EBsHSM9lLmELuUVCMJ-tPE0kDcok1io9IwUO6WPC-cM");
   });
+
+  test('ephemeralMessage v1', () {
+    // V1 ephemeral topic should be `dmE-` instead of `dm-`.
+    var addressA = "0x7E75Ee2a9f7D65E49cd8619b24B5731EbFa8064C"; // random
+    var addressB = "0xFE4464Ea091FE9A8bE25BF7B413616b087F1D896"; // random
+    var conversationTopic = Topic.directMessageV1(addressA, addressB);
+    expect(
+      conversationTopic,
+      '/xmtp/0/dm-$addressA-$addressB/proto',
+    );
+    expect(
+      Topic.ephemeralMessage(conversationTopic),
+      '/xmtp/0/dmE-$addressA-$addressB/proto',
+    );
+  });
+
+  test('ephemeralMessage v2', () {
+    var randomId = "abc123";
+    var conversationTopic = Topic.messageV2(randomId);
+    expect(
+      conversationTopic,
+      '/xmtp/0/m-$randomId/proto',
+    );
+    expect(
+      Topic.ephemeralMessage(conversationTopic),
+      '/xmtp/0/mE-$randomId/proto',
+    );
+  });
 }

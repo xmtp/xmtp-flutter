@@ -16,6 +16,9 @@ class Conversation {
   /// NOTE: this is a good identifier for local caching purposes.
   final String topic;
 
+  /// This is the ephemeral message topic for this conversation.
+  final String ephemeralTopic;
+
   /// This distinctly identifies between two addresses.
   /// Note: this will be empty for older v1 conversations.
   final String conversationId;
@@ -43,6 +46,8 @@ class Conversation {
     required this.peer,
   })  : version = xmtp.Message_Version.v1,
         topic = Topic.directMessageV1(me.hex, peer.hex),
+        ephemeralTopic =
+            Topic.ephemeralMessage(Topic.directMessageV1(me.hex, peer.hex)),
         conversationId = "",
         metadata = <String, String>{},
         invite = xmtp.InvitationV1();
@@ -54,6 +59,7 @@ class Conversation {
     required this.peer,
   })  : version = xmtp.Message_Version.v2,
         topic = invite.topic,
+        ephemeralTopic = Topic.ephemeralMessage(invite.topic),
         conversationId = invite.context.conversationId,
         metadata = invite.context.metadata;
 
