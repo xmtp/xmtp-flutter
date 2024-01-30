@@ -15,7 +15,7 @@ dependencies:
   flutter_app_badger: ^1.5.0
   flutter_hooks: ^0.18.6
   go_router: ^6.2.0
-  http: ^0.13.5
+  http: ^1.1.2
   intl: ^0.18.0
   path: ^1.8.2
   path_provider: ^2.0.13
@@ -25,9 +25,7 @@ dependencies:
   shared_preferences: ^2.0.18
   sqlite3_flutter_libs: ^0.5.13
   url_launcher: ^6.1.10
-  # TODO: replace the example with the official WC v2 package:
-  #       https://github.com/WalletConnect/WalletConnectFlutterV2
-  walletconnect_dart: ^0.0.11
+  web3modal_flutter: ^3.1.0
   web3dart: ^2.6.1
   xmtp:
     path: '../'
