@@ -3,10 +3,10 @@
 library xmtp;
 
 export 'src/auth.dart' show CompatPrivateKeyBundle;
-export 'src/common/api.dart' show Api;
+export 'src/common/api.dart' show Api, ApiEnv;
 export 'src/common/signature.dart' show Signer, CredentialsToSigner;
 export 'src/client.dart' show Client;
-export 'src/conversation/conversation.dart' show Conversation;
+export 'src/conversation/conversation.dart' show Conversation, GroupConversation, DirectConversation;
 export 'src/content/decoded.dart' show DecodedContent, DecodedMessage;
 export 'src/content/codec.dart' show Codec;
 export 'src/content/codec_registry.dart' show CodecRegistry;
