@@ -15,6 +15,7 @@ import 'package:xmtp/src/content/attachment_codec.dart';
 import 'package:xmtp/src/content/codec.dart';
 import 'package:xmtp/src/content/decoded.dart';
 import 'package:xmtp/src/content/reaction_codec.dart';
+import 'package:xmtp/src/content/remote_attachment_codec.dart';
 import 'package:xmtp/src/content/reply_codec.dart';
 import 'package:xmtp/src/content/text_codec.dart';
 import 'package:xmtp/src/client.dart';
@@ -562,6 +563,44 @@ void main() {
 
   test(
     skip: skipUnlessTestServerEnabled,
+    "remote attachments: uploading and downloading attachments should work",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet);
+      var bob = await Client.createFromWallet(bobApi, bobWallet);
+      var files = TestRemoteFiles();
+
+      // If Alice sends a message and then a remote attachment...
+      var convo = await alice.newConversation(bob.address.hex);
+      await alice.sendMessage(convo, "Here's an attachment for you:");
+      var attachment = Attachment("foo.txt", "text/plain", utf8.encode("bar"));
+      var remote = await alice.upload(attachment, files.upload);
+      await alice.sendMessage(convo, remote,
+          contentType: contentTypeRemoteAttachment);
+      await delayToPropagate();
+
+      // ... then Bob should see the messages.
+      var messages = await bob.listMessages(convo);
+      expect(messages.length, 2);
+      expect((messages[0].content as RemoteAttachment).filename, "foo.txt");
+      expect((messages[1].content as String), "Here's an attachment for you:");
+
+      // And he should be able to download the remote attachment.
+      var downloaded = await bob.download(
+        messages[0].content as RemoteAttachment,
+        downloader: files.download,
+      );
+      expect((downloaded.content as Attachment).filename, "foo.txt");
+      expect((downloaded.content as Attachment).mimeType, "text/plain");
+      expect(utf8.decode((downloaded.content as Attachment).data), "bar");
+    },
+  );
+
+  test(
+    skip: skipUnlessTestServerEnabled,
     "codecs: sending codec encoded message to user",
     () async {
       var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
@@ -840,6 +879,19 @@ void main() {
       );
     },
   );
+}
+
+/// Helper to store and retrieve remote files.
+class TestRemoteFiles {
+  var files = {};
+
+  Future<String> upload(List<int> data) async {
+    var url = "https://example.com/${Random.secure().nextInt(1000000)}";
+    files[url] = data;
+    return url;
+  }
+
+  Future<List<int>> download(String url) async => files[url];
 }
 
 /// Helper to seed random conversations in a test account.
