@@ -18,6 +18,34 @@ void main() {
     expect(decoded.content, "foo bar");
   });
 
+  test('compression should work during encoding and decoding', () async {
+    var registry = CodecRegistry();
+    registry.registerCodec(TextCodec());
+    var someText = "blah blah blah" * 100;
+    for (var compression in CodecRegistry.supportedCompressions) {
+      var encodedSmall = await registry.encode(
+        DecodedContent(contentTypeText, someText),
+        compression: compression,
+      );
+      var encodedLarge = await registry.encode(
+        DecodedContent(contentTypeText, someText),
+      );
+      expect(encodedSmall.type, contentTypeText);
+      expect(encodedLarge.type, contentTypeText);
+      expect(encodedSmall.hasCompression(), true);
+      expect(encodedLarge.hasCompression(), false);
+      expect(encodedSmall.content.isNotEmpty, true);
+      expect(encodedLarge.content.isNotEmpty, true);
+      expect(encodedSmall.content.length < encodedLarge.content.length, true);
+      var decodedSmall = await registry.decode(encodedSmall);
+      var decodedLarge = await registry.decode(encodedLarge);
+      expect(decodedSmall.contentType, contentTypeText);
+      expect(decodedLarge.contentType, contentTypeText);
+      expect(decodedSmall.content, someText);
+      expect(decodedLarge.content, someText);
+    }
+  });
+
   test('unknown types should throw', () async {
     var registry = CodecRegistry();
     registry.registerCodec(TextCodec());
