@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:web3dart/credentials.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
+import 'package:http/http.dart' as http;
 
 import 'auth.dart';
 import 'common/api.dart';
@@ -10,6 +13,7 @@ import 'content/codec.dart';
 import 'content/codec_registry.dart';
 import 'content/composite_codec.dart';
 import 'content/reaction_codec.dart';
+import 'content/remote_attachment_codec.dart';
 import 'content/reply_codec.dart';
 import 'content/text_codec.dart';
 import 'content/decoded.dart';
@@ -124,6 +128,7 @@ class Client implements Codec<DecodedContent> {
       CompositeCodec(),
       ReplyCodec(),
       ReactionCodec(),
+      RemoteAttachmentCodec(),
       AttachmentCodec(),
     ];
     for (var codec in commonCodecs..addAll(customCodecs)) {
@@ -256,6 +261,30 @@ class Client implements Codec<DecodedContent> {
   /// newer than the latest in the cache.
   Future<bool> refreshContactConsentPreferences({bool fullRefresh = false}) =>
       _contacts.refreshConsents(_auth.keys, fullRefresh: fullRefresh);
+
+  /// This downloads the [attachment] and returns the [DecodedContent].
+  /// If [downloader] is specified then that will be used to fetch the payload.
+  Future<DecodedContent> download(
+    RemoteAttachment attachment, {
+    RemoteDownloader? downloader,
+  }) async {
+    downloader ??= (url) => http.readBytes(Uri.parse(url));
+    var decrypted = await attachment.download(downloader);
+    return decode(decrypted);
+  }
+
+  /// This uploads the [attachment] and returns the [RemoteAttachment].
+  /// The [uploader] will be used to upload the payload and produce the URL.
+  /// It will be uploaded after applying the specified [compression].
+  Future<RemoteAttachment> upload(
+    Attachment attachment,
+    RemoteUploader uploader, {
+    xmtp.Compression? compression = xmtp.Compression.COMPRESSION_GZIP,
+  }) async {
+    var content = DecodedContent(contentTypeAttachment, attachment);
+    var encoded = await _codecs.encode(content, compression: compression);
+    return RemoteAttachment.upload(attachment.filename, encoded, uploader);
+  }
 
   /// This lists messages sent to the [conversation].
   ///
