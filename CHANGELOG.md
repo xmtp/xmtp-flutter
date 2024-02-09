@@ -1,3 +1,6 @@
+## 1.4.0
+- feat: implement codecs for Remote Attachments
+
 ## 1.3.1
 - fix: respect limits on batched messages
 
