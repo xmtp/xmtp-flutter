@@ -17,7 +17,7 @@ jobs:
       - uses: dart-lang/setup-dart@a57a6c04cf7d4840e88432aad6281d1e125f0d46
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.13.9'
+          flutter-version: '3.16.9'
           channel: 'stable'
       - run: docker-compose -p xmtp -f "tool/local-node/docker-compose.yml" up -d
       - run: flutter pub get
