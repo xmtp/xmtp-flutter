@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:web3dart/credentials.dart';
+import 'package:web3dart/crypto.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import '../common/topic.dart';
@@ -6,14 +8,35 @@ import '../common/topic.dart';
 /// This represents an ongoing conversation.
 /// It can be provided to [Client] to [listMessages] and [sendMessage].
 /// The [Client] also allows you to [streamMessages] from this [Conversation].
+sealed class Conversation {
+  /// This is a unique identifier for this conversation.
+  /// NOTE: this is a good identifier for local caching purposes.
+  String get id;
+
+  /// When the conversation was first created.
+  DateTime get createdAt;
+}
+
+/// This represents a group conversation.
+class GroupConversation extends Conversation {
+  final Uint8List groupId;
+  @override
+  final DateTime createdAt;
+
+  GroupConversation.v3(this.groupId, this.createdAt);
+
+  @override
+  String get id => bytesToHex(groupId);
+}
+
+/// This represents a direct message conversation.
 ///
 /// It attempts to give uniform shape to v1 and v2 conversations.
-class Conversation {
+class DirectConversation extends Conversation {
   /// This indicates whether this a v1 or v2 conversation.
   final xmtp.Message_Version version;
 
   /// This is the underlying unique topic name for this conversation.
-  /// NOTE: this is a good identifier for local caching purposes.
   final String topic;
 
   /// This is the ephemeral message topic for this conversation.
@@ -40,7 +63,7 @@ class Conversation {
   /// When the conversation was first created.
   final DateTime createdAt;
 
-  Conversation.v1(
+  DirectConversation.v1(
     this.createdAt, {
     required this.me,
     required this.peer,
@@ -52,7 +75,7 @@ class Conversation {
         metadata = <String, String>{},
         invite = xmtp.InvitationV1();
 
-  Conversation.v2(
+  DirectConversation.v2(
     this.invite,
     this.createdAt, {
     required this.me,
@@ -64,8 +87,11 @@ class Conversation {
         metadata = invite.context.metadata;
 
   @override
+  String get id => topic;
+
+  @override
   String toString() {
-    return 'Conversation{version:$version me:$me peer:$peer topic:$topic}';
+    return 'DirectConversation{version:$version me:$me peer:$peer topic:$topic}';
   }
 }
 

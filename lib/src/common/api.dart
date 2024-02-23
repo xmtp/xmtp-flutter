@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:grpc/grpc.dart' as grpc;
+import 'package:quiver/collection.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 const sdkVersion = '1.4.0';
@@ -12,22 +13,78 @@ const clientVersion = "xmtp-flutter/$sdkVersion";
 /// The conversation managers use this to automatically partition calls.
 const maxQueryRequestsPerBatch = 50;
 
+enum ApiEnv {
+  dev,
+  production,
+  custom,
+}
+
+class ApiConfig {
+  final ApiEnv env;
+  final String host;
+  final int port;
+  final bool isSecure;
+  final bool debugLogRequests;
+  final String appVersion;
+
+  ApiConfig({
+    required this.env,
+    required this.host,
+    required this.port,
+    required this.isSecure,
+    required this.debugLogRequests,
+    required this.appVersion,
+  });
+}
+
+final _hostByEnv = BiMap<ApiEnv, String>()
+  ..addAll({
+    ApiEnv.dev: 'dev.xmtp.network',
+    ApiEnv.production: 'production.xmtp.network',
+    ApiEnv.custom: '127.0.0.1',
+  });
+
 /// This is an instance of the [xmtp.MessageApiClient] with some
 /// metadata helpers (e.g. for setting the authorization token).
 class Api {
+  final ApiConfig config;
   final xmtp.MessageApiClient client;
   final grpc.ClientChannel _channel;
   final _MetadataManager _metadata;
 
-  Api._(this._channel, this.client, this._metadata);
+  Api._(this.config, this._channel, this.client, this._metadata);
+
+  factory Api.createEnv(
+    ApiEnv env, {
+    bool debugLogRequests = kDebugMode,
+    String appVersion = "dev/0.0.0-development",
+  }) =>
+      Api.create(
+        env: env,
+        host: _hostByEnv[env]!,
+        port: 5556,
+        isSecure: env != ApiEnv.custom,
+        debugLogRequests: debugLogRequests,
+        appVersion: appVersion,
+      );
 
   factory Api.create({
+    ApiEnv? env,
     String host = 'dev.xmtp.network',
     int port = 5556,
     bool isSecure = true,
     bool debugLogRequests = kDebugMode,
     String appVersion = "dev/0.0.0-development",
   }) {
+    var config = ApiConfig(
+      env: env ?? _hostByEnv.inverse[host] ?? ApiEnv.custom,
+      // ^ explicit else guess from host else custom
+      host: host,
+      port: port,
+      isSecure: isSecure,
+      debugLogRequests: debugLogRequests,
+      appVersion: appVersion,
+    );
     var channel = grpc.ClientChannel(
       host,
       port: port,
@@ -40,6 +97,7 @@ class Api {
     );
 
     return Api.createAdvanced(
+      config,
       channel,
       options: grpc.CallOptions(
         timeout: const Duration(minutes: 5),
@@ -52,6 +110,7 @@ class Api {
   }
 
   factory Api.createAdvanced(
+    ApiConfig config,
     grpc.ClientChannel channel, {
     grpc.CallOptions? options,
     Iterable<grpc.ClientInterceptor>? interceptors,
@@ -67,7 +126,7 @@ class Api {
       interceptors: interceptors,
     );
     metadata.appVersion = appVersion;
-    return Api._(channel, client, metadata);
+    return Api._(config, channel, client, metadata);
   }
 
   void clearAuthTokenProvider() {

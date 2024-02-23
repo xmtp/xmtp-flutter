@@ -63,11 +63,11 @@ class ForegroundSession extends ChangeNotifier {
       ]);
 
   /// Finds saved list of conversations.
-  Future<List<xmtp.Conversation>> findConversations() =>
+  Future<List<xmtp.DirectConversation>> findConversations() =>
       _db.selectConversations().get();
 
   /// Watch a stream that emits the list of conversations.
-  Stream<List<xmtp.Conversation>> watchConversations() =>
+  Stream<List<xmtp.DirectConversation>> watchConversations() =>
       _db.selectConversations().watch();
 
   /// Finds the [xmtp.DecodedMessage]s for the given [topic] in our local database.
@@ -78,8 +78,8 @@ class ForegroundSession extends ChangeNotifier {
   Stream<List<xmtp.DecodedMessage>> watchMessages(String topic) =>
       _db.selectMessages(topic).watch();
 
-  /// Finds the [xmtp.Conversation] for the given [topic] in our local database.
-  Future<xmtp.Conversation?> findConversation(String topic) =>
+  /// Finds the [xmtp.DirectConversation] for the given [topic] in our local database.
+  Future<xmtp.DirectConversation?> findConversation(String topic) =>
       _db.selectConversation(topic).getSingleOrNull();
 
   Future<int> findNewMessageCount(String topic) =>
@@ -120,6 +120,7 @@ class ForegroundSession extends ChangeNotifier {
   /// It uses an ephemeral XMTP client in the foreground to do this.
   /// Once authorized keys are saved, this starts the background isolate.
   Future<bool> authorize(xmtp.Signer wallet) async {
+    debugPrint('authorizing wallet ${wallet.address}');
     checkState(!initialized, message: "already initialized");
     try {
       WidgetsFlutterBinding.ensureInitialized();
@@ -135,6 +136,7 @@ class ForegroundSession extends ChangeNotifier {
 
       return true;
     } catch (err) {
+      debugPrint('failed to authorize wallet: $err');
       return false;
     }
   }

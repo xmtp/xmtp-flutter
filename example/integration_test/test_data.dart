@@ -14,12 +14,12 @@ final addressC =
     EthereumAddress.fromHex("0x3333333333444444444455555555556666666666");
 
 /// Conversations
-final convoAandB = xmtp.Conversation.v1(
+final convoAandB = xmtp.DirectConversation.v1(
   DateTime.now().subtract(const Duration(minutes: 2)),
   me: addressA,
   peer: addressB,
 );
-final convoAandC = xmtp.Conversation.v1(
+final convoAandC = xmtp.DirectConversation.v1(
   DateTime.now().subtract(const Duration(minutes: 1)),
   me: addressA,
   peer: addressC,

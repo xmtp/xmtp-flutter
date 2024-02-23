@@ -1,6 +1,10 @@
 import 'dart:typed_data';
+import 'dart:io';
 
+import 'package:meta/meta.dart';
+import 'package:path/path.dart' as p;
 import 'package:web3dart/credentials.dart';
+import 'package:xmtp_bindings_flutter/xmtp_bindings_flutter.dart' as libxmtp;
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 import 'package:http/http.dart' as http;
 
@@ -20,6 +24,7 @@ import 'content/decoded.dart';
 import 'conversation/conversation.dart';
 import 'conversation/conversation_v1.dart';
 import 'conversation/conversation_v2.dart';
+import 'conversation/conversation_v3.dart';
 import 'conversation/manager.dart';
 
 /// This is the top-level entrypoint to the XMTP flutter SDK.
@@ -72,6 +77,7 @@ class Client implements Codec<DecodedContent> {
   xmtp.PrivateKeyBundle get keys => _auth.keys;
 
   final Api _api;
+  final libxmtp.Client? _v3Client;
   final ConversationManager _conversations;
   final AuthManager _auth;
   final ContactManager _contacts;
@@ -80,6 +86,7 @@ class Client implements Codec<DecodedContent> {
   Client._(
     this.address,
     this._api,
+    this._v3Client,
     this._conversations,
     this._auth,
     this._contacts,
@@ -92,8 +99,15 @@ class Client implements Codec<DecodedContent> {
     Api api,
     Signer wallet, {
     List<Codec> customCodecs = const [],
+    bool enableGroups = false,
   }) async {
-    var client = await _createUninitialized(api, wallet.address, customCodecs);
+    var client = await _createUninitialized(
+      wallet,
+      api,
+      wallet.address,
+      customCodecs,
+      enableV3: enableGroups,
+    );
     await client._auth.authenticateWithCredentials(wallet);
     await client._contacts.ensureSavedContact(client._auth.keys);
     return client;
@@ -105,9 +119,17 @@ class Client implements Codec<DecodedContent> {
     Api api,
     xmtp.PrivateKeyBundle keys, {
     List<Codec> customCodecs = const [],
+    Signer? signer,
+    bool enableGroups = false,
   }) async {
     var address = keys.wallet;
-    var client = await _createUninitialized(api, address, customCodecs);
+    var client = await _createUninitialized(
+      signer,
+      api,
+      address,
+      customCodecs,
+      enableV3: enableGroups,
+    );
     await client._auth.authenticateWithKeys(keys);
     await client._contacts.ensureSavedContact(client._auth.keys);
     return client;
@@ -117,10 +139,16 @@ class Client implements Codec<DecodedContent> {
   /// It assembles the graph of dependencies needed by the [Client].
   /// It does not perform authentication nor does it ensure the contact is saved.
   static Future<Client> _createUninitialized(
+    Signer? signer,
     Api api,
     EthereumAddress address,
-    List<Codec> customCodecs,
-  ) async {
+    List<Codec> customCodecs, {
+    bool enableV3 = false,
+    // TODO: expose a way for the app to specify these (instead of ephemeral defaults)
+    String? dbPath,
+    libxmtp.U8Array32? encryptionKey,
+  }) async {
+    await libxmtp.libxmtpInit();
     var auth = AuthManager(address, api);
     var codecs = CodecRegistry();
     var commonCodecs = <Codec>[
@@ -138,12 +166,43 @@ class Client implements Codec<DecodedContent> {
       codecs.registerCodec(codec);
     }
     var contacts = ContactManager(api, auth);
+    // TODO: permit disabling of "legacy" v1/v2 and just use libxmtp/v3
     var v1 = ConversationManagerV1(address, api, auth, codecs, contacts);
     var v2 = ConversationManagerV2(address, api, auth, codecs, contacts);
-    var conversations = ConversationManager(address, contacts, v1, v2);
+    ConversationManagerV3? v3;
+    libxmtp.Client? v3Client;
+    if (enableV3) {
+      // TODO: default to path_provider app folder instead of tmp
+      dbPath ??= p.join(
+        Directory.systemTemp.createTempSync().path,
+        "${address.hex}.${api.config.env}.xmtp.db",
+      );
+      // TODO: default to a consistent/stored key
+      encryptionKey ??= libxmtp.U8Array32.init();
+      var scheme = api.config.isSecure ? "https": "http";
+      var created = await libxmtp.createClient(
+        host: "$scheme://${api.config.host}:${api.config.port}",
+        isSecure: api.config.isSecure,
+        dbPath: dbPath,
+        encryptionKey: encryptionKey,
+        accountAddress: address.hex,
+      );
+      v3Client = switch (created) {
+        libxmtp.CreatedClient_Ready(field0: var v3Client) => v3Client,
+        libxmtp.CreatedClient_RequiresSignature(field0: var req) =>
+          signer == null
+              ? throw StateError("signer required to initialize client")
+              : await req.sign(
+                  signature: await signer.signPersonalMessage(req.textToSign),
+                ),
+      };
+      v3 = ConversationManagerV3(address, v3Client, codecs);
+    }
+    var conversations = ConversationManager(address, contacts, v1, v2, v3);
     return Client._(
       address,
       api,
+      v3Client,
       conversations,
       auth,
       contacts,
@@ -172,12 +231,37 @@ class Client implements Codec<DecodedContent> {
     DateTime? end,
     int? limit,
     xmtp.SortDirection? sort = xmtp.SortDirection.SORT_DIRECTION_DESCENDING,
+    @experimental
+    bool includeGroups = false, // TODO enable by default when we're ready
+    bool includeDirects = true,
   }) =>
-      _conversations.listConversations(start, end, limit, sort);
+      _conversations.listConversations(
+        start,
+        end,
+        limit,
+        sort,
+        includeGroups,
+        includeDirects,
+      );
+
+  @experimental
+  Future<GroupConversation> createGroup({
+    List<String> addresses = const [],
+  }) =>
+      _v3Client == null
+          ? throw UnsupportedError("groups are not enabled")
+          : _conversations.createGroup(addresses);
 
   /// This exposes a stream of new [Conversation]s for the user.
-  Stream<Conversation> streamConversations() =>
-      _conversations.streamConversations();
+  Stream<Conversation> streamConversations({
+    @experimental
+    bool includeGroups = false, // TODO enable by default when we're ready
+    bool includeDirects = true,
+}) =>
+      _conversations.streamConversations(
+        includeGroups,
+        includeDirects,
+      );
 
   /// This creates or resumes a [Conversation] with [address].
   /// If a [conversationId] is specified then that will
@@ -197,7 +281,7 @@ class Client implements Codec<DecodedContent> {
   ///    metadata: {"title": "Bar Chat"},
   ///  );
   ///  ```
-  Future<Conversation> newConversation(
+  Future<DirectConversation> newConversation(
     String address, {
     String conversationId = "",
     Map<String, String> metadata = const <String, String>{},
@@ -364,7 +448,8 @@ class Client implements Codec<DecodedContent> {
     // TODO: support fallback and compression
   }) async {
     // Sending a message implies allowing an unknown contact.
-    if (checkContactConsent(conversation.peer.hex) == ContactConsent.unknown) {
+    if (conversation is DirectConversation &&
+        checkContactConsent(conversation.peer.hex) == ContactConsent.unknown) {
       await allowContact(conversation.peer.hex);
     }
     return _conversations.sendMessage(

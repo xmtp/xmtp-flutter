@@ -33,7 +33,7 @@ class BackgroundManager {
   /// When one of these errors, but someone is still listening
   /// to the corresponding database stream, then we attempt to
   /// recover the remote stream.
-  StreamSubscription<xmtp.Conversation>? _conversationStream;
+  StreamSubscription<xmtp.DirectConversation>? _conversationStream;
   StreamSubscription<xmtp.DecodedMessage>? _messageStream;
   final Set<String> _messageStreamTopics = {};
 
@@ -77,7 +77,7 @@ class BackgroundManager {
   Future<bool> canMessage(String address) => _client.canMessage(address);
 
   /// This creates or resumes a [Conversation] with [address].
-  Future<xmtp.Conversation> newConversation(
+  Future<xmtp.DirectConversation> newConversation(
     String address, {
     String conversationId = "",
     Map<String, String> metadata = const <String, String>{},
@@ -121,7 +121,7 @@ class BackgroundManager {
   }
 
   Future<int> _refreshMessages(
-    Iterable<xmtp.Conversation> conversations, {
+    Iterable<xmtp.DirectConversation> conversations, {
     DateTime? since,
   }) async {
     var messages = await _client.listBatchMessages(
@@ -140,8 +140,12 @@ class BackgroundManager {
       var c = await _db.selectLastConversation().getSingleOrNull();
       since = c?.createdAt;
     }
-    var conversations = await _client.listConversations(start: since);
-    await _db.saveConversations(conversations);
+    var conversations = await _client.listConversations(
+      start: since,
+      includeGroups: false,
+      includeDirects: true,
+    );
+    await _db.saveConversations(conversations.cast<xmtp.DirectConversation>());
     _nudgeToBackfillEmptyHistories();
     return conversations.length;
   }
@@ -171,7 +175,10 @@ class BackgroundManager {
 
   Future<void> _restartConversationStream() async {
     _stopConversationStream();
-    _conversationStream = _client.streamConversations().listen(
+    _conversationStream = _client.streamConversations(
+      includeGroups: false,
+      includeDirects: true,
+    ).cast<xmtp.DirectConversation>().listen(
       (convo) async {
         await _db.saveConversations([convo]);
         await _refreshMessages([convo]);

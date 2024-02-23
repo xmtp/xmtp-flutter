@@ -19,14 +19,14 @@ EthereumAddress? useMe() => session.me;
 ///
 /// This causes the remote list of conversations to be
 /// streamed by the [ForegroundSession] while the hooked widget is active.
-AsyncSnapshot<List<xmtp.Conversation>> useConversationList() =>
+AsyncSnapshot<List<xmtp.DirectConversation>> useConversationList() =>
     _useLookupStream(
       () => session.findConversations(),
       () => session.watchConversations(),
     );
 
 /// The details of a single conversation.
-AsyncSnapshot<xmtp.Conversation?> useConversation(String topic) => fh
+AsyncSnapshot<xmtp.DirectConversation?> useConversation(String topic) => fh
     .useFuture(fh.useMemoized(() => session.findConversation(topic), [topic]));
 
 /// The list of messages in a conversation.

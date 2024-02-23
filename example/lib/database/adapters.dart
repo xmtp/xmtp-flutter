@@ -8,8 +8,8 @@ import 'database.dart' as db;
 /// These convert between their [xmtp] form for display and
 /// and their [Database] form for storage.
 
-/// Adapts an [xmtp.Conversation] into a [db.Conversation] for storage.
-extension XmtpToDbConversation on xmtp.Conversation {
+/// Adapts an [xmtp.DirectConversation] into a [db.Conversation] for storage.
+extension XmtpToDbConversation on xmtp.DirectConversation {
   db.Conversation toDb() => db.Conversation(
         topic: topic,
         version: version.index,
@@ -21,17 +21,17 @@ extension XmtpToDbConversation on xmtp.Conversation {
       );
 }
 
-/// Adapts a [db.Conversation] into an [xmtp.Conversation] for display.
+/// Adapts a [db.Conversation] into an [xmtp.DirectConversation] for display.
 extension DbToXmtpConversation on db.Conversation {
-  xmtp.Conversation toXmtp() {
+  xmtp.DirectConversation toXmtp() {
     if (xmtp.Message_Version.values[version] == xmtp.Message_Version.v1) {
-      return xmtp.Conversation.v1(
+      return xmtp.DirectConversation.v1(
         DateTime.fromMillisecondsSinceEpoch(createdAt),
         me: EthereumAddress.fromHex(me),
         peer: EthereumAddress.fromHex(peer),
       );
     }
-    return xmtp.Conversation.v2(
+    return xmtp.DirectConversation.v2(
       xmtp.InvitationV1.fromBuffer(invite),
       DateTime.fromMillisecondsSinceEpoch(createdAt),
       me: EthereumAddress.fromHex(me),

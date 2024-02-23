@@ -63,7 +63,9 @@ class Topic {
       EthereumAddress.fromHex(walletAddress).hexEip55;
 }
 
-Future<String> generateUserPreferencesIdentifier(List<int> privateKey) async =>
-    libxmtp.generatePrivatePreferencesTopicIdentifier(
-      privateKeyBytes: Uint8List.fromList(privateKey),
-    );
+Future<String> generateUserPreferencesIdentifier(List<int> privateKey) async {
+  await libxmtpInit(); // typically no-op because it's already initialized
+  return generatePrivatePreferencesTopicIdentifier(
+    privateKeyBytes: Uint8List.fromList(privateKey),
+  );
+}

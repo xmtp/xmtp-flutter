@@ -127,7 +127,7 @@ class _BottomQrModal extends HookWidget {
           IconButton(
             tooltip: "QR Code",
             padding: const EdgeInsets.all(0),
-            icon: QrImage(
+            icon: QrImageView(
               data: wallet.displayUri,
               version: QrVersions.auto,
               // foregroundColor: Colors.deepPurple.shade900,

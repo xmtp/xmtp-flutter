@@ -41,19 +41,19 @@ class ConversationManagerV1 {
     this._contacts,
   );
 
-  Future<Conversation> fromBlob(Uint8List blob) async {
+  Future<DirectConversation> fromBlob(Uint8List blob) async {
     return _conversationFromIntro(xmtp.Message.fromBuffer(blob));
   }
 
-  Future<Conversation> newConversation(String address) async {
+  Future<DirectConversation> newConversation(String address) async {
     var peer = EthereumAddress.fromHex(address);
     var createdAt = DateTime.now();
-    return Conversation.v1(createdAt, me: _me, peer: peer);
+    return DirectConversation.v1(createdAt, me: _me, peer: peer);
   }
 
-  /// This returns the latest [Conversation] with [address].
+  /// This returns the latest [DirectConversation] with [address].
   /// If none can be found then this returns `null`.
-  Future<Conversation?> findConversation(String address) async {
+  Future<DirectConversation?> findConversation(String address) async {
     var peer = EthereumAddress.fromHex(address);
     var conversations = await listConversations();
     try {
@@ -63,7 +63,7 @@ class ConversationManagerV1 {
     }
   }
 
-  Future<List<Conversation>> listConversations([
+  Future<List<DirectConversation>> listConversations([
     DateTime? start,
     DateTime? end,
     int? limit,
@@ -99,7 +99,7 @@ class ConversationManagerV1 {
   Future<Conversation?> decryptConversation(xmtp.Envelope env) =>
       _conversationFromIntro(xmtp.Message.fromBuffer(env.message));
 
-  Future<Conversation> _conversationFromIntro(xmtp.Message msg) async {
+  Future<DirectConversation> _conversationFromIntro(xmtp.Message msg) async {
     var header = xmtp.MessageHeaderV1.fromBuffer(msg.v1.headerBytes);
     var encoded = await decryptMessageV1(msg.v1, _auth.keys);
     var intro = await _createDecodedMessage(
@@ -117,11 +117,11 @@ class ConversationManagerV1 {
     );
     var topic = Topic.directMessageV1(_me.hex, peer.hex);
     _seenTopics.add(topic);
-    return Conversation.v1(createdAt, me: _me, peer: peer);
+    return DirectConversation.v1(createdAt, me: _me, peer: peer);
   }
 
   Future<List<DecodedMessage>> listMessages(
-    Iterable<Conversation> conversations, {
+    Iterable<DirectConversation> conversations, {
     Iterable<Pagination>? paginations,
     xmtp.SortDirection? sort,
   }) async {
@@ -152,7 +152,8 @@ class ConversationManagerV1 {
     return messages.where((msg) => msg != null).map((msg) => msg!).toList();
   }
 
-  Stream<DecodedMessage> streamMessages(Iterable<Conversation> conversations) {
+  Stream<DecodedMessage> streamMessages(
+      Iterable<DirectConversation> conversations) {
     if (conversations.isEmpty) {
       return const Stream.empty();
     }
@@ -167,7 +168,7 @@ class ConversationManagerV1 {
   }
 
   Stream<DecodedMessage> streamEphemeralMessages(
-      Iterable<Conversation> conversations) {
+      Iterable<DirectConversation> conversations) {
     if (conversations.isEmpty) {
       return const Stream.empty();
     }
@@ -205,7 +206,7 @@ class ConversationManagerV1 {
   }
 
   Future<DecodedMessage> sendMessage(
-    Conversation conversation,
+    DirectConversation conversation,
     Object content, {
     xmtp.ContentTypeId? contentType,
     bool isEphemeral = false,
@@ -217,7 +218,7 @@ class ConversationManagerV1 {
   }
 
   Future<DecodedMessage?> sendMessageEncoded(
-    Conversation conversation,
+    DirectConversation conversation,
     xmtp.EncodedContent encoded,
     bool isEphemeral,
   ) async {
@@ -251,7 +252,7 @@ class ConversationManagerV1 {
   }
 
   Future<xmtp.PublishResponse> _sendIntros(
-    Conversation conversation,
+    DirectConversation conversation,
     xmtp.MessageV1 msg,
   ) async {
     var addresses = [

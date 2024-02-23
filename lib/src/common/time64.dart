@@ -1,9 +1,14 @@
 import 'package:fixnum/fixnum.dart';
 
 /// This contains helpers for dealing with Int64 timestamps.
+/// It handles converting between timestamps in these forms:
+///  - integer milliseconds since epoch
+///  - integer nanoseconds since epoch
+///  - DateTime
 
 /// This produces the current time in nanoseconds since the epoch.
-Int64 nowNs() => Int64(DateTime.now().millisecondsSinceEpoch) * 1000000;
+/// NOTE: resolution is <= 1 microsecond
+Int64 nowNs() => Int64(DateTime.now().microsecondsSinceEpoch) * 1000;
 
 /// This produces the current time in milliseconds since the epoch.
 Int64 nowMs() => Int64(DateTime.now().millisecondsSinceEpoch);
@@ -16,7 +21,7 @@ const _nsThreshold = 1000000000000000000; // 1e18
 /// This adds helpers to [Int64] to help deal with ambiguous timestamps.
 extension DateTimeInt64 on Int64 {
   DateTime toDateTime() => this > _nsThreshold
-      ? DateTime.fromMillisecondsSinceEpoch(toInt() ~/ 1000000)
+      ? DateTime.fromMicrosecondsSinceEpoch(toInt() ~/ 1000)
       : DateTime.fromMillisecondsSinceEpoch(toInt());
 
   Int64 toMs() => this > _nsThreshold ? this ~/ 1000000 : this;
@@ -28,5 +33,5 @@ extension DateTimeInt64 on Int64 {
 extension Int64DateTime on DateTime {
   Int64 toMs64() => Int64(millisecondsSinceEpoch);
 
-  Int64 toNs64() => Int64(millisecondsSinceEpoch) * 1000000;
+  Int64 toNs64() => Int64(microsecondsSinceEpoch) * 1000;
 }

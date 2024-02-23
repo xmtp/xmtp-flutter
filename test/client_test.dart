@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:xmtp/src/common/time64.dart';
 import 'package:xmtp/src/contact.dart';
+import 'package:xmtp/src/conversation/conversation.dart';
 import 'package:xmtp_proto/xmtp_proto.dart' as xmtp;
 
 import 'package:xmtp/src/common/api.dart';
@@ -56,7 +58,7 @@ void main() {
       // Bob can see the conversation but hasn't received any messages yet.
       // And he has neither denied nor allowed the contact.
       var bobConvos = (await bob.listConversations());
-      var bobConvo = bobConvos[0];
+      var bobConvo = bobConvos[0] as DirectConversation;
       var bobMessages = await bob.listMessages(bobConvo);
       expect(bobConvos.length, 1);
       expect(bobConvo.peer, alice.address);
@@ -114,6 +116,63 @@ void main() {
         "$bobAddress> oh, hello Alice!",
         "$bobAddress> I have a note for you",
       ]);
+    },
+  );
+
+  // This creates 3 new users with connected clients and
+  // sends group messages back and forth between them.
+  test(
+    skip: skipUnlessTestServerEnabled,
+    "messaging: group creation and listing",
+    () async {
+      var aliceWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var aliceApi = createTestServerApi();
+      var bobWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var bobApi = createTestServerApi();
+      var connieWallet = EthPrivateKey.createRandom(Random.secure()).asSigner();
+      var connieApi = createTestServerApi();
+      var alice = await Client.createFromWallet(aliceApi, aliceWallet,
+          enableGroups: true);
+      var bob =
+          await Client.createFromWallet(bobApi, bobWallet, enableGroups: true);
+      var connie =
+          await Client.createFromWallet(bobApi, bobWallet, enableGroups: true);
+      await delayToPropagate();
+      var aliceAddress = aliceWallet.address.hex;
+      var bobAddress = bobWallet.address.hex;
+      var connieAddress = bobWallet.address.hex;
+
+      for (var client in [alice, bob, connie]) {
+        var cs = (await client.listConversations(includeGroups: true));
+        expect((cs.length), 0);
+      }
+      var group = await alice.createGroup(
+        addresses: [bobAddress, connieAddress],
+      );
+      await delayToPropagate();
+
+      for (var client in [alice, bob, connie]) {
+        var cs = (await client.listConversations(includeGroups: true));
+        expect((cs.length), 1);
+        expect(cs.whereType<GroupConversation>().first.groupId, group.groupId);
+        var msgs = await client.listMessages(cs.first);
+        expect(msgs.length, 0);
+      }
+
+      await alice.sendMessage(group, "hello everyone!");
+
+      for (var client in [alice, bob, connie]) {
+        var cs = (await client.listConversations(includeGroups: true));
+        expect((cs.length), 1);
+        expect(cs.whereType<GroupConversation>().first.groupId, group.groupId);
+        var msgs = await client.listMessages(cs.first);
+        expect(msgs.length, 1);
+        expect(msgs[0].id.isNotEmpty, true);
+        expect(msgs[0].sentAt.difference(DateTime.now()).inSeconds.abs(),
+            lessThan(10));
+        expect(msgs[0].sender, aliceWallet.address);
+        expect(msgs[0].content, "hello everyone!");
+      }
     },
   );
 
@@ -183,7 +242,7 @@ void main() {
       var chat = await alice.newConversation(
         bob.address.hex,
         conversationId: "https://example.com/alice-bob-chat",
-      );
+      ) as DirectConversation;
       await delayToPropagate();
 
       // The push notification server is watching for Bob's new chats
@@ -195,7 +254,8 @@ void main() {
       expect(pushBobConvos.envelopes.length, 1);
 
       // When we push that new conversation to Bob he can decrypt it.
-      var bobChat = await bob.decryptConversation(pushBobConvos.envelopes[0]);
+      var bobChat = await bob.decryptConversation(pushBobConvos.envelopes[0])
+       as DirectConversation;
       expect(bobChat!.topic, chat.topic);
 
       // Then when alice sends a message
@@ -743,7 +803,7 @@ void main() {
       var wallet = EthPrivateKey.fromHex("... private key ...").asSigner();
       var client = await Client.createFromWallet(api, wallet);
       var conversations = await client.listConversations();
-      for (var convo in conversations) {
+      for (var convo in conversations.whereType<DirectConversation>()) {
         debugPrint('Conversation with ${convo.peer} ${convo.version}');
         debugPrint(' -> ${convo.topic}');
         var messages = await client.listMessages(convo);

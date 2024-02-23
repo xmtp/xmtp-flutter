@@ -12,7 +12,7 @@ part 'database.g.dart';
 
 /// The table storing each [Conversation].
 ///
-/// These are constructed from the [xmtp.Conversation] objects.
+/// These are constructed from the [xmtp.DirectConversation] objects.
 /// See adapters [XmtpToDbConversation] and [DbToXmtpConversation].
 ///
 /// This [Table] definition generates some of the code in `database.g.dart`.
@@ -83,7 +83,7 @@ class Database extends _$Database {
   /// Saves the given [conversations] to the database.
   ///
   /// When a conversation already exists the insert will be ignored.
-  Future<void> saveConversations(List<xmtp.Conversation> conversations) =>
+  Future<void> saveConversations(List<xmtp.DirectConversation> conversations) =>
       batch((batch) => batch.insertAll(
             this.conversations,
             conversations.map((convo) => convo.toDb()),
@@ -107,12 +107,12 @@ class Database extends _$Database {
       ));
 
   /// Select the specified conversation.
-  SingleOrNullSelectable<xmtp.Conversation> selectConversation(String topic) =>
+  SingleOrNullSelectable<xmtp.DirectConversation> selectConversation(String topic) =>
       (conversations.select()..where((c) => c.topic.equals(topic)))
           .map((c) => c.toXmtp());
 
   /// Select the most recently created conversation.
-  SingleOrNullSelectable<xmtp.Conversation> selectLastConversation() =>
+  SingleOrNullSelectable<xmtp.DirectConversation> selectLastConversation() =>
       (conversations.select()
             ..orderBy([
               (c) =>
@@ -122,7 +122,7 @@ class Database extends _$Database {
           .map((c) => c.toXmtp());
 
   /// List all conversations.
-  MultiSelectable<xmtp.Conversation> selectConversations() =>
+  MultiSelectable<xmtp.DirectConversation> selectConversations() =>
       (conversations.select()
             ..orderBy([
               (c) =>
@@ -131,7 +131,7 @@ class Database extends _$Database {
           .map((convo) => convo.toXmtp());
 
   /// List conversations with no messages yet.
-  MultiSelectable<xmtp.Conversation> selectEmptyConversations() {
+  MultiSelectable<xmtp.DirectConversation> selectEmptyConversations() {
     // TODO: perf tune (consider just writing the SQL)
     return (conversations.select()
           ..where((c) => notExistsQuery(

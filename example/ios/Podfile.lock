@@ -29,7 +29,7 @@ PODS:
     - sqlite3/rtree
   - url_launcher_ios (0.0.1):
     - Flutter
-  - xmtp_bindings_flutter (0.0.1-development.3)
+  - xmtp_bindings_flutter (0.1.0-development.1)
 
 DEPENDENCIES:
   - cryptography_flutter (from `.symlinks/plugins/cryptography_flutter/ios`)
@@ -68,16 +68,16 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   cryptography_flutter: 381bdacc984abcfbe3ca45ef7c76566ff061614c
-  Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
+  Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_app_badger: b87fc231847b03b92ce1412aa351842e7e97932f
   integration_test: 13825b8a9334a850581300559b8839134b124670
-  path_provider_foundation: c68054786f1b4f3343858c1e1d0caaded73f0be9
+  path_provider_foundation: 3784922295ac71e43754bd15e0653ccfd36a147c
   shared_preferences_foundation: 986fc17f3d3251412d18b0265f9c64113a8c2472
   sqlite3: fd89671d969f3e73efe503ce203e28b016b58f68
   sqlite3_flutter_libs: 78f93cb854d4680595bc2c63c57209a104b2efb1
   url_launcher_ios: 08a3dfac5fb39e8759aeb0abbd5d9480f30fc8b4
-  xmtp_bindings_flutter: 9699cc6008d8fc86ed5dd072b4b920255d01926f
+  xmtp_bindings_flutter: f153afd7a9fc8afcf86708e76e1dc04f534e6095
 
-PODFILE CHECKSUM: 70d9d25280d0dd177a5f637cdb0f0b0b12c6a189
+PODFILE CHECKSUM: 819463e6a0290f5a72f145ba7cde16e8b6ef0796
 
 COCOAPODS: 1.12.1
