@@ -1,6 +1,7 @@
 # xmtp-flutter
 
-![Test](https://github.com/xmtp/xmtp-flutter/actions/workflows/test.yml/badge.svg) ![Status](https://img.shields.io/badge/Project_Status-Production-31CA54)
+> **Deprecation Notice**  
+> The Flutter SDK is being deprecated. Please migrate to alternatives. For updates, join [XMTP Discord](https://discord.gg/invite/xmtp).
 
 `xmtp-flutter` provides a Dart implementation of an XMTP message API client for use with Flutter apps.
 
@@ -46,7 +47,7 @@ var client = await xmtp.Client.createFromWallet(api, wallet);
 ## Use local storage
 
 > **Important**  
-> If you are building a production-grade app, be sure to use an architecture that includes a local cache backed by an XMTP SDK.  
+> If you are building a production-grade app, be sure to use an architecture that includes a local cache backed by an XMTP SDK.
 
 To learn more, see [Use a local cache](https://xmtp.org/docs/tutorials/performance#use-a-local-cache).
 
@@ -56,6 +57,7 @@ The client has two constructors: `createFromWallet` and `createFromKeys`.
 
 The first time a user uses a new device, they should call `createFromWallet`. This will prompt them
 to sign a message to do one of the following:
+
 - Create a new identity (if they're new)
 - Enable their existing identity (if they've used XMTP before)
 
@@ -239,21 +241,6 @@ Because `xmtp-flutter` is in active development, you should expect breaking revi
 
 XMTP communicates about breaking revisions in the [XMTP Discord community](https://discord.gg/xmtp), providing as much advance notice as possible. Additionally, breaking revisions in an `xmtp-flutter` release will be described on the [Releases page](https://github.com/xmtp/xmtp-flutter/releases).
 
-## Deprecation
-
-Older versions of the SDK will eventually be deprecated, which means:
-
-1. The network will not support and eventually actively reject connections from clients using deprecated versions.
-2. Bugs will not be fixed in deprecated versions.
-
-The following table provides the deprecation schedule.
-
-| Announced  | Effective  | Minimum Version | Rationale                                                                                                         |
-| ---------- | ---------- | --------------- | ----------------------------------------------------------------------------------------------------------------- |
-| There are no deprecations scheduled for `xmtp-flutter` at this time. |  |          |  |
-
-Bug reports, feature requests, and PRs are welcome in accordance with these [contribution guidelines](https://github.com/xmtp/xmtp-flutter/blob/main/CONTRIBUTING.md).
-
 ## XMTP `production` and `dev` network environments
 
 XMTP provides both `production` and `dev` network environments to support the development phases of your project.
@@ -266,7 +253,7 @@ accessed from or moved to the `production` network, and vice versa.
 
 > **Note**  
 > When you [create a client](#create-a-client), it connects to an XMTP `local`
-environment by default. When you create the `Api` used by the `Client`, it must have a valid network `host`.
+> environment by default. When you create the `Api` used by the `Client`, it must have a valid network `host`.
 
 Here are some best practices for when to use each environment:
 
@@ -287,9 +274,9 @@ advance notice in the [XMTP Discord community](https://discord.gg/xmtp).
 3. Update [CHANGELOG.md](https://github.com/xmtp/xmtp-flutter/blob/main/CHANGELOG.md) to include release notes for the new version number.
 4. Merge the updates from Steps 2 & 3 into the `main` branch via a Pull Request.
 5. Checkout the `main` branch, pull the latest changes & run the following commands replacing `{VERSION_NUMBER}` with the new version.
-    ```bash
-    git tag -a v{VERSION_NUMBER} -m "xmtp release v{VERSION_NUMBER}"
-    git push origin v{VERSION_NUMBER}
-    ```
-4. Watch the [GitHub Actions](https://github.com/xmtp/xmtp-flutter/actions) and ensure the `Release` Action succeeds, confirming the package has been published.
-5. Ensure the new version is up to date at https://pub.dev/packages/xmtp.
+   ```bash
+   git tag -a v{VERSION_NUMBER} -m "xmtp release v{VERSION_NUMBER}"
+   git push origin v{VERSION_NUMBER}
+   ```
+6. Watch the [GitHub Actions](https://github.com/xmtp/xmtp-flutter/actions) and ensure the `Release` Action succeeds, confirming the package has been published.
+7. Ensure the new version is up to date at https://pub.dev/packages/xmtp.
