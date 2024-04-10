@@ -1,7 +1,7 @@
 # xmtp-flutter
 
 > **Deprecation Notice**  
-> The Flutter SDK is being deprecated. Please migrate to alternatives. For updates, join [XMTP Discord](https://discord.gg/invite/xmtp).
+> The Flutter SDK is being deprecated. Please migrate to alternatives. For contributions, please join [XMTP Discord](https://discord.gg/invite/xmtp).
 
 `xmtp-flutter` provides a Dart implementation of an XMTP message API client for use with Flutter apps.
 
