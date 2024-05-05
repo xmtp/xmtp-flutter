@@ -44,7 +44,7 @@ class ConversationManagerV2 {
 
   /// This creates a new conversation with [address] in the specified [context].
   /// This includes sending out the new chat invitations to [_me] and [peer].
-  Future<Conversation> newConversation(
+  Future<DirectConversation> newConversation(
     String address,
     xmtp.InvitationV1_Context context,
   ) async {
@@ -66,7 +66,7 @@ class ConversationManagerV2 {
   /// This returns the latest [Conversation] with [address]
   /// that has the same [context.conversationId].
   /// If none can be found then this returns `null`.
-  Future<Conversation?> findConversation(
+  Future<DirectConversation?> findConversation(
     String address,
     xmtp.InvitationV1_Context context,
   ) async {
@@ -84,7 +84,7 @@ class ConversationManagerV2 {
   /// This returns the list of all invited [Conversation]s.
   ///
   /// Note: bad conversation invitation envelopes are discarded.
-  Future<List<Conversation>> listConversations([
+  Future<List<DirectConversation>> listConversations([
     DateTime? start,
     DateTime? end,
     int? limit,
@@ -128,7 +128,7 @@ class ConversationManagerV2 {
   /// This helper adapts an [envelope] (with an invite) into a [Conversation].
   ///
   /// It returns `null` when the envelope could not be decoded.
-  Future<Conversation?> _conversationFromEnvelope(xmtp.Envelope e) async {
+  Future<DirectConversation?> _conversationFromEnvelope(xmtp.Envelope e) async {
     try {
       var invite = xmtp.SealedInvitation.fromBuffer(e.message);
       checkState(e.hasMessage(), message: 'missing envelope message');
@@ -141,7 +141,7 @@ class ConversationManagerV2 {
   }
 
   /// This helper adapts a [sealed] invitation into a [Conversation].
-  Future<Conversation> _conversationFromInvite(
+  Future<DirectConversation> _conversationFromInvite(
     xmtp.SealedInvitation sealed,
     Int64 expectedTimestampNs,
   ) async {
@@ -157,7 +157,7 @@ class ConversationManagerV2 {
       (a) => a != _me,
       orElse: () => sender,
     );
-    return Conversation.v2(
+    return DirectConversation.v2(
       invite,
       createdAt,
       me: _me,
@@ -167,7 +167,7 @@ class ConversationManagerV2 {
 
   /// This sends the [content] as a message to the [conversation].
   Future<DecodedMessage> sendMessage(
-    Conversation conversation,
+    DirectConversation conversation,
     Object content, {
     xmtp.ContentTypeId? contentType,
     bool isEphemeral = false,
@@ -181,7 +181,7 @@ class ConversationManagerV2 {
   /// This sends the [encoded] message to the [conversation].
   /// If it cannot be decoded then it still sends but this returns `null`.
   Future<DecodedMessage?> sendMessageEncoded(
-    Conversation conversation,
+    DirectConversation conversation,
     xmtp.EncodedContent encoded,
     bool isEphemeral,
   ) async {
@@ -211,7 +211,7 @@ class ConversationManagerV2 {
 
   /// This lists the current messages in the [conversations]
   Future<List<DecodedMessage>> listMessages(
-    Iterable<Conversation> conversations, {
+    Iterable<DirectConversation> conversations, {
     Iterable<Pagination>? paginations,
     xmtp.SortDirection? sort,
   }) async {
@@ -247,7 +247,8 @@ class ConversationManagerV2 {
   }
 
   /// This exposes the stream of new messages in the [conversations].
-  Stream<DecodedMessage> streamMessages(Iterable<Conversation> conversations) {
+  Stream<DecodedMessage> streamMessages(
+      Iterable<DirectConversation> conversations) {
     if (conversations.isEmpty) {
       return const Stream.empty();
     }
@@ -266,7 +267,7 @@ class ConversationManagerV2 {
 
   /// This exposes the stream of ephemeral messages in the [conversations].
   Stream<DecodedMessage> streamEphemeralMessages(
-      Iterable<Conversation> conversations) {
+      Iterable<DirectConversation> conversations) {
     if (conversations.isEmpty) {
       return const Stream.empty();
     }
@@ -287,7 +288,7 @@ class ConversationManagerV2 {
   ///
   /// It returns `null` when the message could not be decoded.
   Future<DecodedMessage?> decryptMessage(
-    Conversation conversation,
+    DirectConversation conversation,
     xmtp.Message msg,
   ) async =>
       _decodedFromMessage(
@@ -299,7 +300,7 @@ class ConversationManagerV2 {
   ///
   /// It returns `null` when the message could not be decoded.
   Future<DecodedMessage?> _decodedFromMessage(
-    Conversation conversation,
+    DirectConversation conversation,
     xmtp.Message msg,
   ) async {
     var signed = await _decryptMessageV2(msg.v2, conversation.invite);

@@ -183,7 +183,8 @@ class ContactManager {
     List<int> payload,
   ) async {
     try {
-      var decrypted = await libxmtp.userPreferencesDecrypt(
+      await libxmtpInit(); // typically no-op because it's already initialized
+      var decrypted = await userPreferencesDecrypt(
         publicKey: keys.identity.publicKey.getEncoded(false),
         privateKey: keys.identity.privateKey,
         encryptedMessage: Uint8List.fromList(payload),
@@ -226,7 +227,8 @@ class ContactManager {
     xmtp.PrivatePreferencesAction action,
   ) async {
     var topic = await Topic.userPreferences(keys.identity.privateKey);
-    var payload = await libxmtp.userPreferencesEncrypt(
+    await libxmtpInit(); // typically no-op because it's already initialized
+    var payload = await userPreferencesEncrypt(
       publicKey: keys.identity.publicKey.getEncoded(false),
       privateKey: keys.identity.privateKey,
       message: action.writeToBuffer(),
